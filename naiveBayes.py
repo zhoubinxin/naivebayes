@@ -1,21 +1,34 @@
 # naiveBayes算法
+import re
+
 from numpy import *
 
 
 # 词表到向量的转换函数
 def loadDataSet():
+    """
+    读取数据
+
+    :return:
+    """
     postingList = []
     classVec = []
     with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
         dataSet = [line.strip().split('\t') for line in file.readlines()]
 
     for item in dataSet:
-        # 1->ham：表示非垃圾短信
+        # ham -> 0：表示非垃圾短信
+        # spam -> 1：表示垃圾短信
         if item[0] == 'ham':
             classVec.append(1)
         else:
             classVec.append(0)
-        postingList.append(item[1].split(' '))
+
+        # 将每条短信拆分为单词列表
+        words = re.split(r'\W+', item[1])
+        # 移除空字符串并转换为小写
+        words = [word.lower() for word in words if word != '']
+        postingList.append(words)
 
     return postingList, classVec
 
@@ -99,7 +112,10 @@ def bagOfWords2VecMN(vocabList, inputSet):
 
 
 def main():
-    loadDataSet()
+    listOposts, listClasses = loadDataSet()
+    # print(listOposts)
+    myVocabList = createVocabList(listOposts)
+    print(myVocabList)
 
 
 if __name__ == '__main__':
