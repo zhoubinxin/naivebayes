@@ -5,26 +5,21 @@ from numpy import *
 
 
 def main():
-    # 读取数据
+    # 加载数据集
     listOposts, listClasses = naiveBayes.loadDataSet()
 
+    # 创建词汇表
     myVocabList = naiveBayes.createVocabList(listOposts)
-    print(myVocabList)
-    print(naiveBayes.setOfWords2Vec(myVocabList, listOposts[0]))
-    print(naiveBayes.setOfWords2Vec(myVocabList, listOposts[3]))
 
-    listOposts, listClasses = naiveBayes.loadDataSet()
-    myVocabList = naiveBayes.createVocabList(listOposts)
+    # 训练朴素贝叶斯分类器
     trainMat = []
     for postinDoc in tqdm(listOposts):
         trainMat.append(naiveBayes.setOfWords2Vec(myVocabList, postinDoc))
-    print(trainMat)
-    p0V, p1V, pAb = naiveBayes.trainNB0(trainMat, listClasses)
-    print(pAb)
-    print(p0V)
-    print(p1V)
 
-    naiveBayes.testingNB()
+    # 训练数据
+    p0V, p1V, pAb = naiveBayes.trainNB0(array(trainMat), array(listClasses))
+
+    print(p0V, p1V, pAb)
 
 
 if __name__ == '__main__':
