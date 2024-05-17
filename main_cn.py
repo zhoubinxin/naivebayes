@@ -3,15 +3,16 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
+import nativeBayesCN as nbcn
 import naiveBayes as nb
 
 
 def main():
     # 加载数据集
-    listOposts, listClasses = nb.loadDataSet()
+    listOposts, listClasses = nbcn.loadDataSet()
 
     # 创建词汇表
-    myVocabList = nb.createVocabList(listOposts)
+    myVocabList = nbcn.createVocabList(listOposts)
 
     # 构建词向量矩阵
     trainMat = []
@@ -37,10 +38,14 @@ def main():
     f1 = f1_score(y_test, y_pred)
 
     # 保存数据到txt
-    with open('result/v2.txt', 'w', encoding='utf-8') as file:
+    with open('result/cn_v2.txt', 'w', encoding='utf-8') as file:
+        # 词汇表 myVocabList
+        file.write("词汇表:\n")
+        file.write(str(myVocabList))
+
         # 分类器
         # p0V, p1V, pAb
-        file.write("分类器:\n")
+        file.write("\n分类器:\n")
         file.write(f'p0V: {p0V}\n')
         file.write(f'p1V: {p1V}\n')
         file.write(f'pAb: {pAb}\n')

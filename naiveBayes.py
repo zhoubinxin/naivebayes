@@ -3,15 +3,14 @@ import re
 
 from numpy import *
 from tqdm import tqdm
-import jieba
 
 
 # 词表到向量的转换函数
 def loadDataSet():
     """
     读取数据
-
-    :return:
+    :return: postingList: 词条切分后的文档集合
+             classVec: 类别标签
     """
     postingList = []  # 存储文本
     classVec = []  # 存储标签
@@ -35,32 +34,6 @@ def loadDataSet():
     return postingList, classVec
 
 
-def loadCNDataSet():
-    """
-    读取中文数据集
-
-    :return:
-    """
-    postingList = []  # 存储文本
-    classVec = []  # 存储标签
-    with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
-        dataSet = [line.strip().split('\t') for line in file.readlines()]
-
-    for item in tqdm(dataSet, desc='Loading data...'):
-        # 0：非垃圾短信；1：垃圾短信
-        classVec.append(item[1])
-
-        # 将每条短信拆分为单词列表
-        try:
-            words = jieba.lcut(item[2], cut_all=False)
-            postingList.append(words)
-        except IndexError as e:
-            print('\n', e)
-            pass
-
-    return postingList, classVec
-
-
 def loadTestDataSet():
     postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
                    ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
@@ -74,14 +47,13 @@ def loadTestDataSet():
 
 def createVocabList(dataSet):
     """
-    提取数据集中的单词列表
-
-    :param dataSet:
-    :return:
+    提取数据集中的单词列表，去除重复的单词
+    :param dataSet: 数据集
+    :return: list(vocabSet)：返回一个包含所有文档中出现的不重复词的列表
     """
     # 创建一个空集
     vocabSet = set([])
-    for document in tqdm(dataSet, desc='Creating vocabulary list...'):
+    for document in tqdm(dataSet, desc='创建词表'):
         # 创建两个集合的并集
         vocabSet = vocabSet | set(document)
     return list(vocabSet)
@@ -89,18 +61,37 @@ def createVocabList(dataSet):
 
 def setOfWords2Vec(vocabList, inputSet):
     """
-    将输入的文本转换为向量形式，将输入集合中的词语在词表中对应的位置设置为 1
+    词表到向量的转换
     :param vocabList: 词表
-    :param inputSet: 输入集合
-    :return:
+    :param inputSet: 文档
+    :return: returnVec: 文档向量
     """
     # 创建一个其中所含元素都为0的向量
     returnVec = [0] * len(vocabList)
+
+    # 遍历文档中的所有单词
     for word in inputSet:
         if word in vocabList:
+            # 如果词表中的单词在输入文档中出现，则将returnVec中对应位置的值设为1
             returnVec[vocabList.index(word)] = 1
         else:
             print(f"the word: {word} is not in my Vocabulary!")
+    return returnVec
+
+
+def bagOfWords2VecMN(vocabList, inputSet):
+    """
+    词袋到向量的转换
+    :param vocabList: 词袋
+    :param inputSet: 文档
+    :return: returnVec: 文档向量
+    """
+    # 和词集模型相比，词袋模型会考虑词条出现的次数
+    returnVec = [0] * len(vocabList)
+    for word in inputSet:
+        # 如果文档中的单词在词汇表中，则相应向量位置加1
+        if word in vocabList:
+            returnVec[vocabList.index(word)] += 1
     return returnVec
 
 
@@ -109,16 +100,21 @@ def trainNB0(trainMatrix, trainCategory):
     朴素贝叶斯分类器训练函数
     :param trainMatrix: 由文本向量组成的矩阵
     :param trainCategory: 训练样本对应的标签
-    :return:
+    :return: p0Vec: 非垃圾词汇的概率
+             p1Vec: 垃圾词汇的概率
+             pAbusive: 垃圾邮件的概率
     """
-    numTrainDocs = len(trainMatrix)  # 训练样本的数量
-    numWords = len(trainMatrix[0])  # 词表的大小
+    numTrainDocs = len(trainMatrix)  # 文档个数
+    numWords = len(trainMatrix[0])  # 单词个数
     pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾邮件的概率
     # 初始化概率
+    # 拉普拉斯平滑
     p0Num = ones(numWords)
     p1Num = ones(numWords)
     p0Denom = 2.0
     p1Denom = 2.0
+
+    # 遍历所有文档，统计每个单词在垃圾邮件和非垃圾邮件中出现的次数
     for i in range(numTrainDocs):
         if trainCategory[i] == 1:
             # 向量相加
@@ -127,7 +123,7 @@ def trainNB0(trainMatrix, trainCategory):
         else:
             p0Num += trainMatrix[i]  # 非垃圾邮件中出现该词的次数
             p0Denom += sum(trainMatrix[i])
-    # 对每个元素素做除法
+    # 对每个元素做除法求概率，为了避免下溢出的影响，对计算结果取自然对数
     p1Vect = log(p1Num / p1Denom)
     p0Vect = log(p0Num / p0Denom)
     return p0Vect, p1Vect, pAbusive
@@ -137,8 +133,8 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     """
     朴素贝叶斯分类函数
     :param vec2Classify: 待分类的文本向量
-    :param p0Vec: 非垃圾邮件的概率
-    :param p1Vec: 垃圾邮件的概率
+    :param p0Vec: 非垃圾词汇的概率
+    :param p1Vec: 垃圾词汇的概率
     :param pClass1: 垃圾邮件的概率
     :return: 分类结果
     """
@@ -170,20 +166,6 @@ def testingNB():
     print(testEntry, 'calssified as: ', classifyNB(thisDoc, p0V, p1V, pAb))
 
 
-def bagOfWords2VecMN(vocabList, inputSet):
-    """
-    朴素贝叶斯词袋模型
-    :param vocabList:
-    :param inputSet:
-    :return:
-    """
-    returnVec = [0] * len(vocabList)
-    for word in inputSet:
-        if word in vocabList:
-            returnVec[vocabList.index(word)] += 1
-    return returnVec
-
-
 def main():
     # listOposts, listClasses = loadDataSet()
     # listOposts, listClasses = loadTestDataSet()
@@ -197,8 +179,7 @@ def main():
     # print(pAb)
     # print(p0V)
     # print(p1V)
-    # testingNB()
-    loadCNDataSet()
+    testingNB()
 
 
 if __name__ == '__main__':
