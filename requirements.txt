@@ -1,3 +1,4 @@
+jieba==0.42.1
 mlxtend==0.23.1
 numpy==1.26.4
 scikit_learn==1.4.2
