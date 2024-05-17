@@ -5,7 +5,19 @@ import multiprocessing as mp
 from itertools import islice
 
 
-def loadDataSet():
+def load_stop_words():
+    """
+    加载停用词
+    :return:
+    """
+    stop_words = set()
+    with open('./data/cnsmss/stopWord.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            stop_words.add(line.strip())
+    return stop_words
+
+
+def loadDataSet(stop_words, lines=5000):
     """
     读取中文数据集
 
@@ -13,8 +25,6 @@ def loadDataSet():
     """
     postingList = []  # 存储文本
     classVec = []  # 存储标签
-
-    lines = 5000  # 限制数据集大小
 
     with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
         dataSet = [line.strip().split('\t') for line in islice(file, lines)]
@@ -24,11 +34,22 @@ def loadDataSet():
         classVec.append(int(item[1]))
 
         # 将每条短信拆分为单词列表
+        # try:
+        #     words = jieba.lcut(item[2], cut_all=False)
+        #     postingList.append(words)
+        # except IndexError:
+        #     # 空文本
+        #     pass
+
         try:
             words = jieba.lcut(item[2], cut_all=False)
+            # 去除停用词
+            for word in words:
+                if word in stop_words:
+                    words.remove(word)
             postingList.append(words)
-        except IndexError as e:
-            print('\n', e)
+        except IndexError:
+            # 空文本
             pass
 
     return postingList, classVec
@@ -54,7 +75,7 @@ def createVocabList(dataSet):
     with mp.Pool(processes=num_processes) as pool:
         # 使用 imap_unordered 并行处理每个数据块
         results = list(
-            tqdm(pool.imap_unordered(vocab_process, chunks), total=num_processes, desc='创建词汇表：')
+            tqdm(pool.imap_unordered(vocab_process, chunks), total=len(chunks), desc='创建词汇表：')
         )
 
     # 将所有结果合并
@@ -67,3 +88,12 @@ def vocab_process(chunk):
     for document in chunk:
         vocabSet = vocabSet | set(document)
     return vocabSet
+
+
+def main():
+    stop_words = load_stop_words()
+    print(stop_words)
+
+
+if __name__ == '__main__':
+    main()

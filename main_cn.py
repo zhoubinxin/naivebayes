@@ -8,8 +8,11 @@ import naiveBayes as nb
 
 
 def main():
+    # 加载停用词
+    stop_words = nbcn.load_stop_words()
     # 加载数据集
-    listOposts, listClasses = nbcn.loadDataSet()
+    lines = 800000
+    listOposts, listClasses = nbcn.loadDataSet(stop_words, lines)
 
     # 创建词汇表
     myVocabList = nbcn.createVocabList(listOposts)
@@ -17,8 +20,8 @@ def main():
     # 构建词向量矩阵
     trainMat = []
     for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
-        # trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
-        trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
+        trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
+        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
 
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
@@ -38,14 +41,10 @@ def main():
     f1 = f1_score(y_test, y_pred)
 
     # 保存数据到txt
-    with open('result/cn_v2.txt', 'w', encoding='utf-8') as file:
-        # 词汇表 myVocabList
-        file.write("词汇表:\n")
-        file.write(str(myVocabList))
-
+    with open('result/score.txt', 'w', encoding='utf-8') as file:
         # 分类器
         # p0V, p1V, pAb
-        file.write("\n分类器:\n")
+        file.write("分类器:\n")
         file.write(f'p0V: {p0V}\n')
         file.write(f'p1V: {p1V}\n')
         file.write(f'pAb: {pAb}\n')
