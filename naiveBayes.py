@@ -3,6 +3,7 @@ import re
 
 from numpy import *
 from tqdm import tqdm
+import jieba
 
 
 # 词表到向量的转换函数
@@ -34,6 +35,32 @@ def loadDataSet():
     return postingList, classVec
 
 
+def loadCNDataSet():
+    """
+    读取中文数据集
+
+    :return:
+    """
+    postingList = []  # 存储文本
+    classVec = []  # 存储标签
+    with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
+        dataSet = [line.strip().split('\t') for line in file.readlines()]
+
+    for item in tqdm(dataSet, desc='Loading data...'):
+        # 0：非垃圾短信；1：垃圾短信
+        classVec.append(item[1])
+
+        # 将每条短信拆分为单词列表
+        try:
+            words = jieba.lcut(item[2], cut_all=False)
+            postingList.append(words)
+        except IndexError as e:
+            print('\n', e)
+            pass
+
+    return postingList, classVec
+
+
 def loadTestDataSet():
     postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
                    ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
@@ -54,7 +81,7 @@ def createVocabList(dataSet):
     """
     # 创建一个空集
     vocabSet = set([])
-    for document in dataSet:
+    for document in tqdm(dataSet, desc='Creating vocabulary list...'):
         # 创建两个集合的并集
         vocabSet = vocabSet | set(document)
     return list(vocabSet)
@@ -119,9 +146,9 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     p1 = sum(vec2Classify * p1Vec) + log(pClass1)
     p0 = sum(vec2Classify * p0Vec) + log(1.0 - pClass1)
     if p1 > p0:
-        return 1    # 垃圾邮件
+        return 1  # 垃圾邮件
     else:
-        return 0    # 正常邮件
+        return 0  # 正常邮件
 
 
 def testingNB():
@@ -170,7 +197,8 @@ def main():
     # print(pAb)
     # print(p0V)
     # print(p1V)
-    testingNB()
+    # testingNB()
+    loadCNDataSet()
 
 
 if __name__ == '__main__':

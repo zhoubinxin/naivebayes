@@ -8,7 +8,7 @@ import naiveBayes as nb
 
 def main():
     # 加载数据集
-    listOposts, listClasses = nb.loadDataSet()
+    listOposts, listClasses = nb.loadCNDataSet()
 
     # 创建词汇表
     myVocabList = nb.createVocabList(listOposts)
@@ -39,6 +39,31 @@ def main():
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"F1 Score: {f1}")
+
+    # 保存数据到txt
+    with open('v1.txt', 'w', encoding='utf-8') as file:
+        # 词汇表 myVocabList
+        file.write("\n词汇表:\n")
+        file.write(str(myVocabList))
+
+        # 词向量矩阵 trainMat
+        file.write("\n词向量矩阵:\n")
+        file.write(str(trainMat))
+
+        # 分类器
+        # p0V, p1V, pAb
+        file.write("\n分类器:\n")
+        file.write(f'p0V: {p0V}\n')
+        file.write(f'p1V: {p1V}\n')
+        file.write(f'pAb: {pAb}\n')
+
+        # 评估指标
+        # accuracy, precision, recall, f1
+        file.write("\n评估指标:\n")
+        file.write(f'accuracy: {accuracy}\n')
+        file.write(f'precision: {precision}\n')
+        file.write(f'recall: {recall}\n')
+        file.write(f'f1: {f1}\n')
 
 
 if __name__ == '__main__':
