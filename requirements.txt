@@ -1,5 +1,5 @@
-jieba==0.42.1
-mlxtend==0.23.1
-numpy==1.26.4
-scikit_learn==1.4.2
-tqdm==4.66.4
+mlxtend>=0.23.1
+scikit-learn>=1.4.2
+tqdm>=4.66.4
+jieba>=0.42.1
+numpy>=1.26.4
