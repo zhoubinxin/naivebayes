@@ -11,7 +11,7 @@ def main():
     # 加载停用词
     stop_words = nbcn.load_stop_words()
     # 加载数据集
-    lines = 800000
+    lines = 10000
     listOposts, listClasses = nbcn.loadDataSet(stop_words, lines)
 
     # 创建词汇表

@@ -146,6 +146,9 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     else:
         return 0  # 正常邮件
 
+def classifyADOE(vec2Classify, p0Vec, p1Vec, pClass1):
+    # 半朴素贝叶斯分类器
+    p1 = sum(vec2Classify * p1Vec) + log(pClass1)
 
 def testingNB():
     """

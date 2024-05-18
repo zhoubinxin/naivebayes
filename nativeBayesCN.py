@@ -1,8 +1,11 @@
 # naiveBayes算法
+import sqlite3
+
 from tqdm import tqdm
 import jieba
 import multiprocessing as mp
 from itertools import islice
+from numpy import *
 
 
 def load_stop_words():
@@ -34,23 +37,23 @@ def loadDataSet(stop_words, lines=5000):
         classVec.append(int(item[1]))
 
         # 将每条短信拆分为单词列表
-        # try:
-        #     words = jieba.lcut(item[2], cut_all=False)
-        #     postingList.append(words)
-        # except IndexError:
-        #     # 空文本
-        #     pass
-
         try:
             words = jieba.lcut(item[2], cut_all=False)
-            # 去除停用词
-            for word in words:
-                if word in stop_words:
-                    words.remove(word)
             postingList.append(words)
         except IndexError:
             # 空文本
             pass
+
+        # try:
+        #     words = jieba.lcut(item[2], cut_all=False)
+        #     # 去除停用词
+        #     for word in words:
+        #         if word in stop_words:
+        #             words.remove(word)
+        #     postingList.append(words)
+        # except IndexError:
+        #     # 空文本
+        #     pass
 
     return postingList, classVec
 

@@ -8,7 +8,7 @@ import naiveBayes as nb
 
 def main():
     # 加载数据集
-    listOposts, listClasses = nb.loadDataSet()
+    listOposts, listClasses = nb.loadTestDataSet()
 
     # 创建词汇表
     myVocabList = nb.createVocabList(listOposts)
@@ -16,14 +16,14 @@ def main():
     # 构建词向量矩阵
     trainMat = []
     for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
-        # trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
-        trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
-
+        trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
+        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
     X_train, X_test, y_train, y_test = train_test_split(trainMat, listClasses, test_size=0.2, random_state=1)
-
+    print(X_train)
+    print(y_train)
     # 训练朴素贝叶斯分类器
     p0V, p1V, pAb = nb.trainNB0(X_train, y_train)
 
