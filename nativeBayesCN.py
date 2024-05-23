@@ -1,11 +1,8 @@
 # naiveBayes算法
-import sqlite3
-
 from tqdm import tqdm
 import jieba
 import multiprocessing as mp
 from itertools import islice
-from numpy import *
 
 
 def load_stop_words():

@@ -1,3 +1,4 @@
+import pandas as pd
 from mlxtend.evaluate import accuracy_score
 from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
@@ -8,22 +9,23 @@ import naiveBayes as nb
 
 def main():
     # 加载数据集
-    listOposts, listClasses = nb.loadTestDataSet()
-
+    listOposts, listClasses = nb.loadDataSet()
+    print(listOposts)
+    df = pd.DataFrame(listOposts)
+    df.to_csv('./data/listOPosts.csv', index=False)
     # 创建词汇表
     myVocabList = nb.createVocabList(listOposts)
 
     # 构建词向量矩阵
     trainMat = []
     for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
-        trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
-        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
+        # trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
+        trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
     X_train, X_test, y_train, y_test = train_test_split(trainMat, listClasses, test_size=0.2, random_state=1)
-    print(X_train)
-    print(y_train)
+
     # 训练朴素贝叶斯分类器
     p0V, p1V, pAb = nb.trainNB0(X_train, y_train)
 
@@ -36,14 +38,19 @@ def main():
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
 
+    print(f"准确率: {accuracy}")
+    print(f"精确率: {precision}")
+    print(f"召回率: {recall}")
+    print(f"F1值: {f1}")
+
     # 保存数据到txt
-    with open('result/v2.txt', 'w', encoding='utf-8') as file:
+    with open('result/score.txt', 'w', encoding='utf-8') as file:
         # 分类器
         # p0V, p1V, pAb
         file.write("分类器:\n")
-        file.write(f'p0V: {p0V}\n')
-        file.write(f'p1V: {p1V}\n')
         file.write(f'pAb: {pAb}\n')
+        file.write(f'p0V: {str(p0V)}\n')
+        file.write(f'p1V: {str(p1V)}\n')
 
         # 评估指标
         # accuracy, precision, recall, f1

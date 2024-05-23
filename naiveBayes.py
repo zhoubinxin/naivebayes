@@ -1,8 +1,13 @@
 # naiveBayes算法
 import re
+import string
 
-from numpy import *
+import numpy as np
+import pandas as pd
+from nltk.corpus import wordnet
 from tqdm import tqdm
+import nltk
+from nltk.stem import WordNetLemmatizer
 
 
 # 词表到向量的转换函数
@@ -17,7 +22,12 @@ def loadDataSet():
     with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
         dataSet = [line.strip().split('\t') for line in file.readlines()]
 
-    for item in dataSet:
+    # 读取停用词
+    stopwords = set()
+    with open('./data/smss/stopword', 'r', encoding='utf-8') as file:
+        stopwords = set([line.strip() for line in file.readlines()])
+
+    for item in tqdm(dataSet, desc='加载数据'):
         # ham -> 0：表示非垃圾短信
         # spam -> 1：表示垃圾短信
         if item[0] == 'ham':
@@ -27,11 +37,72 @@ def loadDataSet():
 
         # 将每条短信拆分为单词列表
         words = re.split(r'\W+', item[1])
-        # 移除空字符串并转换为小写
-        words = [word.lower() for word in words if word != '']  # 转换为小写并去除空字符串
+        # 移除空字符串并转换为小写，移除停用词
+        words = [word.lower() for word in words if word != '' and word not in stopwords]
         postingList.append(words)
 
     return postingList, classVec
+
+
+def loadDataSet2():
+    """
+    读取数据
+    :return: postingList: 词条切分后的文档集合
+             classVec: 类别标签
+    """
+    postingList = []  # 存储文本
+    classVec = []  # 存储标签
+    with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
+        dataSet = [line.strip().split('\t') for line in file.readlines()]
+
+    for item in tqdm(dataSet, desc='加载数据'):
+        # ham -> 0：表示非垃圾短信
+        # spam -> 1：表示垃圾短信
+        if item[0] == 'ham':
+            classVec.append(1)
+        else:
+            classVec.append(0)
+
+        tokens = nltk.word_tokenize(item[1])  # 分词
+        # 去除标点
+        tokens = [remove_punctuation(token) for token in tokens]
+        # 过滤空字符串
+        tokens = [token for token in tokens if token]
+        # 转为小写
+        tokens = [token.lower() for token in tokens]
+
+        tagged_sent = nltk.pos_tag(tokens)  # 词性标注
+
+        wnl = WordNetLemmatizer()
+        lemmas_sent = []
+        for tag in tagged_sent:
+            wordnet_pos = get_wordnet_pos(tag[1]) or wordnet.NOUN
+            lemmas_sent.append(wnl.lemmatize(tag[0], pos=wordnet_pos))  # 词形还原
+
+        postingList.append(lemmas_sent)
+    return postingList, classVec
+
+
+def remove_punctuation(text):
+    return ''.join([char for char in text if char not in string.punctuation])
+
+
+def get_wordnet_pos(tag):
+    """
+    获取单词的词性
+    :param tag:
+    :return:
+    """
+    if tag.startswith('J'):
+        return wordnet.ADJ
+    elif tag.startswith('V'):
+        return wordnet.VERB
+    elif tag.startswith('N'):
+        return wordnet.NOUN
+    elif tag.startswith('R'):
+        return wordnet.ADV
+    else:
+        return None
 
 
 def loadTestDataSet():
@@ -109,14 +180,14 @@ def trainNB0(trainMatrix, trainCategory):
     pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾邮件的概率
     # 初始化概率
     # 拉普拉斯平滑
-    p0Num = ones(numWords)
-    p1Num = ones(numWords)
-    p0Denom = 2.0
-    p1Denom = 2.0
+    p0Num = np.ones(numWords)
+    p1Num = np.ones(numWords)
+    p0Denom = numWords
+    p1Denom = numWords
 
     # 遍历所有文档，统计每个单词在垃圾邮件和非垃圾邮件中出现的次数
     for i in range(numTrainDocs):
-        if trainCategory[i] == 1:
+        if trainCategory[i]:
             # 向量相加
             p1Num += trainMatrix[i]  # 垃圾邮件中出现该词的次数
             p1Denom += sum(trainMatrix[i])
@@ -124,8 +195,8 @@ def trainNB0(trainMatrix, trainCategory):
             p0Num += trainMatrix[i]  # 非垃圾邮件中出现该词的次数
             p0Denom += sum(trainMatrix[i])
     # 对每个元素做除法求概率，为了避免下溢出的影响，对计算结果取自然对数
-    p1Vect = log(p1Num / p1Denom)
-    p0Vect = log(p0Num / p0Denom)
+    p1Vect = np.log(p1Num / p1Denom)
+    p0Vect = np.log(p0Num / p0Denom)
     return p0Vect, p1Vect, pAbusive
 
 
@@ -139,23 +210,24 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     :return: 分类结果
     """
     # 元素相乘
-    p1 = sum(vec2Classify * p1Vec) + log(pClass1)
-    p0 = sum(vec2Classify * p0Vec) + log(1.0 - pClass1)
+    p1 = sum(vec2Classify * p1Vec) + np.log(pClass1)
+    p0 = sum(vec2Classify * p0Vec) + np.log(1.0 - pClass1)
     if p1 > p0:
         return 1  # 垃圾邮件
     else:
         return 0  # 正常邮件
 
-def classifyADOE(vec2Classify, p0Vec, p1Vec, pClass1):
-    # 半朴素贝叶斯分类器
-    p1 = sum(vec2Classify * p1Vec) + log(pClass1)
 
 def testingNB():
     """
     测试朴素贝叶斯分类器
     :return: 输出测试结果
     """
-    listOPosts, listClasses = loadTestDataSet()
+    listOPosts, listClasses = loadDataSet()
+    # 保存listOPosts
+    print(listOPosts)
+    df = pd.DataFrame(listOPosts)
+    df.to_csv('./data/listOPosts.csv', index=False)
     myVocabList = createVocabList(listOPosts)
     trainMat = []
     for postinDoc in listOPosts:
