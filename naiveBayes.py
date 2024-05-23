@@ -166,6 +166,40 @@ def bagOfWords2VecMN(vocabList, inputSet):
     return returnVec
 
 
+def bagOfWords2VecTFIDF(vocabList, inputSet, postingList):
+    """
+    使用TF-IDF进行特征的权重修正的词袋模型
+    :param postingList:
+    :param vocabList:
+    :param inputSet:
+    :return:
+    """
+
+    returnVec = [0] * len(vocabList)
+    for word in inputSet:
+        if word in vocabList:
+            wordIndex = vocabList.index(word)
+            tf = calcTF(word, inputSet)
+            idf = calcIDF(word, postingList)
+            returnVec[wordIndex] = tf * idf
+    return returnVec
+
+
+def calcTF(word, inputSet):
+    """
+    计算词频 TF
+    """
+    return inputSet.count(word) / len(inputSet)
+
+
+def calcIDF(word, docList):
+    """
+    计算逆文档频率 IDF
+    """
+    numDocsContainingWord = sum([1 for doc in docList if word in doc])
+    return np.log(len(docList) / (1 + numDocsContainingWord))
+
+
 def trainNB0(trainMatrix, trainCategory):
     """
     朴素贝叶斯分类器训练函数
