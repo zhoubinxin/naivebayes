@@ -3,7 +3,6 @@ import multiprocessing as mp
 from itertools import islice
 from tqdm import tqdm
 
-
 def load_stop_words():
     """
     加载停用词列表
@@ -13,7 +12,6 @@ def load_stop_words():
         for line in file:
             stop_words.add(line.strip())
     return stop_words
-
 
 def loadDataSet(stop_words, lines=5000):
     """
@@ -34,7 +32,6 @@ def loadDataSet(stop_words, lines=5000):
                 print(f"警告：数据行格式不正确，已跳过。原始行: '{item}'")
     return postingList, classVec
 
-
 def preprocess_doc(args):
     """
     单个文档预处理函数，用于多进程调用
@@ -42,8 +39,8 @@ def preprocess_doc(args):
     doc, stop_words = args
     return ' '.join(jieba.lcut(doc, cut_all=False) if isinstance(doc, str) else doc)  # 预处理文档并返回处理后的文本字符串
 
-
 if __name__ == '__main__':
+    # 测试nativeBayesCN
     stop_words = load_stop_words()
     listOposts, listClasses = loadDataSet(stop_words)
     print("Data loaded.")

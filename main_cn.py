@@ -1,61 +1,73 @@
-from mlxtend.evaluate import accuracy_score
-from sklearn.metrics import precision_score, recall_score, f1_score
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.pipeline import Pipeline
+import nativeBayesCN as nbcn
+import multiprocessing as mp
+from itertools import repeat
 from tqdm import tqdm
 
-import nativeBayesCN as nbcn
-import naiveBayes as nb
-
+import pandas as pd
 
 def main():
     # 加载停用词
     stop_words = nbcn.load_stop_words()
-    # 加载数据集
-    lines = 10000
+
+    # 加载数据集，并使用多进程预处理以加速
+    lines = 10000  # 数据量可以根据实际情况调整
     listOposts, listClasses = nbcn.loadDataSet(stop_words, lines)
 
-    # 创建词汇表
-    myVocabList = nbcn.createVocabList(listOposts)
+    # 多进程预处理文档
+    with mp.Pool(mp.cpu_count()) as pool:
+        preprocessed_docs = list(
+            tqdm(pool.imap(nbcn.preprocess_doc, zip(listOposts, repeat(stop_words))),
+                 total=len(listOposts), desc='预处理文档'))
 
-    # 构建词向量矩阵
-    trainMat = []
-    for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
-        trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
-        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
+    # 定义模型与参数网格
+    param_grid = {
+        'count_vect__max_df': (0.5, 0.75, 1.0),
+        'gb_clf__learning_rate': (0.01, 0.1, 0.5),
+        'gb_clf__n_estimators': (50, 100, 200),
+    }
+    pipeline = Pipeline([
+        ('count_vect', CountVectorizer()),
+        ('gb_clf', GradientBoostingClassifier(random_state=1))
+    ])
 
-    # 将数据集划分为训练集和测试集
-    # test_size 表示测试集的比例
-    # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
-    X_train, X_test, y_train, y_test = train_test_split(trainMat, listClasses, test_size=0.2, random_state=1)
+    # 划分训练集和验证集
+    X_train, X_test, y_train, y_test = train_test_split(preprocessed_docs, listClasses,
+                                                        test_size=0.2, random_state=1)
 
-    # 训练朴素贝叶斯分类器
-    p0V, p1V, pAb = nb.trainNB0(X_train, y_train)
+    # 使用GridSearchCV进行模型调优
+    grid_search = GridSearchCV(pipeline, param_grid, cv=5, n_jobs=-1, verbose=1)
+    grid_search.fit(X_train, y_train)
 
-    # 预测测试集
-    y_pred = [nb.classifyNB(doc, p0V, p1V, pAb) for doc in X_test]
+    # 最佳参数
+    best_params = grid_search.best_params_
+    print(f"最佳参数: {best_params}")
 
-    # 计算评估指标
+    # 使用最佳参数的模型进行预测
+    y_pred = grid_search.predict(X_test)
+
+    # 评估
     accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='weighted')
+    recall = recall_score(y_test, y_pred, average='weighted')
+    f1 = f1_score(y_test, y_pred, average='weighted')
 
-    # 保存数据到txt
-    with open('result/score.txt', 'w', encoding='utf-8') as file:
-        # 分类器
-        # p0V, p1V, pAb
-        file.write("分类器:\n")
-        file.write(f'p0V: {p0V}\n')
-        file.write(f'p1V: {p1V}\n')
-        file.write(f'pAb: {pAb}\n')
+    print(f"准确率: {accuracy}")
+    print(f"精确率: {precision}")
+    print(f"召回率: {recall}")
+    print(f"F1值: {f1}")
 
-        # 评估指标
-        # accuracy, precision, recall, f1
-        file.write("\n评估指标:\n")
-        file.write(f'accuracy: {accuracy}\n')
-        file.write(f'precision: {precision}\n')
-        file.write(f'recall: {recall}\n')
-        file.write(f'f1: {f1}\n')
+    # 保存结果到txt文件
+    with open('result/best_score.txt', 'w', encoding='utf-8') as file:
+        file.write(f"最佳参数: {best_params}\n")
+        file.write(f"准确率: {accuracy}\n")
+        file.write(f"精确率: {precision}\n")
+        file.write(f"召回率: {recall}\n")
+        file.write(f"F1值: {f1}\n")
 
 
 if __name__ == '__main__':
