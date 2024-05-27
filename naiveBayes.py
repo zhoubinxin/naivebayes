@@ -1,13 +1,11 @@
 # naiveBayes算法
 import re
-import string
 
+import nltk
 import numpy as np
 import pandas as pd
-from nltk.corpus import wordnet
 from tqdm import tqdm
-import nltk
-from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
 
 
 # 词表到向量的转换函数
@@ -22,10 +20,8 @@ def loadDataSet():
     with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
         dataSet = [line.strip().split('\t') for line in file.readlines()]
 
-    # 读取停用词
-    stopwords = set()
-    with open('./data/smss/stopword', 'r', encoding='utf-8') as file:
-        stopwords = set([line.strip() for line in file.readlines()])
+    nltk.download('stopwords')
+    stop_words = set(stopwords.words('english'))
 
     for item in tqdm(dataSet, desc='加载数据'):
         # ham -> 0：表示非垃圾短信
@@ -38,72 +34,10 @@ def loadDataSet():
         # 将每条短信拆分为单词列表
         words = re.split(r'\W+', item[1])
         # 移除空字符串并转换为小写，移除停用词
-        words = [word.lower() for word in words if word != '']
+        words = [word.lower() for word in words if word != '' and word.lower() not in stop_words]
         postingList.append(words)
 
     return postingList, classVec
-
-
-def loadDataSet2():
-    """
-    读取数据
-    :return: postingList: 词条切分后的文档集合
-             classVec: 类别标签
-    """
-    postingList = []  # 存储文本
-    classVec = []  # 存储标签
-    with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
-        dataSet = [line.strip().split('\t') for line in file.readlines()]
-
-    for item in tqdm(dataSet, desc='加载数据'):
-        # ham -> 0：表示非垃圾短信
-        # spam -> 1：表示垃圾短信
-        if item[0] == 'ham':
-            classVec.append(0)
-        else:
-            classVec.append(1)
-
-        tokens = nltk.word_tokenize(item[1])  # 分词
-        # 去除标点
-        tokens = [remove_punctuation(token) for token in tokens]
-        # 过滤空字符串
-        tokens = [token for token in tokens if token]
-        # 转为小写
-        tokens = [token.lower() for token in tokens]
-
-        tagged_sent = nltk.pos_tag(tokens)  # 词性标注
-
-        wnl = WordNetLemmatizer()
-        lemmas_sent = []
-        for tag in tagged_sent:
-            wordnet_pos = get_wordnet_pos(tag[1]) or wordnet.NOUN
-            lemmas_sent.append(wnl.lemmatize(tag[0], pos=wordnet_pos))  # 词形还原
-
-        postingList.append(lemmas_sent)
-    return postingList, classVec
-
-
-def remove_punctuation(text):
-    return ''.join([char for char in text if char not in string.punctuation])
-
-
-def get_wordnet_pos(tag):
-    """
-    获取单词的词性
-    :param tag:
-    :return:
-    """
-    if tag.startswith('J'):
-        return wordnet.ADJ
-    elif tag.startswith('V'):
-        return wordnet.VERB
-    elif tag.startswith('N'):
-        return wordnet.NOUN
-    elif tag.startswith('R'):
-        return wordnet.ADV
-    else:
-        return None
-
 
 def loadTestDataSet():
     postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
@@ -182,6 +116,8 @@ def bagOfWords2VecTFIDF(vocabList, inputSet, postingList):
             tf = calcTF(word, inputSet)
             idf = calcIDF(word, postingList)
             returnVec[wordIndex] = tf * idf
+
+    returnVec = normalize(returnVec)
     return returnVec
 
 
@@ -199,6 +135,17 @@ def calcIDF(word, docList):
     numDocsContainingWord = sum([1 for doc in docList if word in doc])
     return np.log(len(docList) / (1 + numDocsContainingWord))
 
+
+def normalize(vec):
+    """
+    将向量标准化
+    """
+    minVal = min(vec)
+    maxVal = max(vec)
+
+    if maxVal == minVal:  # 避免除以0的情况
+        return vec
+    return [(x - minVal) / (maxVal - minVal) for x in vec]
 
 def trainNB0(trainMatrix, trainCategory):
     """
