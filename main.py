@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 from mlxtend.evaluate import accuracy_score
 from sklearn.metrics import precision_score, recall_score, f1_score
@@ -41,15 +43,19 @@ def main():
     print(f"召回率: {recall}")
     print(f"F1值: {f1}")
 
+    # 构建json结果
+    result = {
+        "vocabList": myVocabList,
+        "p0V": p0V.tolist(),
+        "p1V": p1V.tolist(),
+        "pAb": pAb,
+    }
+    # 保存结果到json文件
+    with open('result/result.json', 'w', encoding='utf-8') as file:
+        json.dump(result, file, ensure_ascii=False)
+
     # 保存数据到txt
     with open('result/score.txt', 'w', encoding='utf-8') as file:
-        # 分类器
-        # p0V, p1V, pAb
-        file.write("分类器:\n")
-        file.write(f'pAb: {pAb}\n')
-        file.write(f'p0V: {str(p0V)}\n')
-        file.write(f'p1V: {str(p1V)}\n')
-
         # 评估指标
         # accuracy, precision, recall, f1
         file.write("\n评估指标:\n")
