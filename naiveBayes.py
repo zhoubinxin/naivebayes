@@ -31,14 +31,14 @@ def loadDataSet():
         # ham -> 0：表示非垃圾短信
         # spam -> 1：表示垃圾短信
         if item[0] == 'ham':
-            classVec.append(1)
-        else:
             classVec.append(0)
+        else:
+            classVec.append(1)
 
         # 将每条短信拆分为单词列表
         words = re.split(r'\W+', item[1])
         # 移除空字符串并转换为小写，移除停用词
-        words = [word.lower() for word in words if word != '' and word not in stopwords]
+        words = [word.lower() for word in words if word != '']
         postingList.append(words)
 
     return postingList, classVec
@@ -59,9 +59,9 @@ def loadDataSet2():
         # ham -> 0：表示非垃圾短信
         # spam -> 1：表示垃圾短信
         if item[0] == 'ham':
-            classVec.append(1)
-        else:
             classVec.append(0)
+        else:
+            classVec.append(1)
 
         tokens = nltk.word_tokenize(item[1])  # 分词
         # 去除标点
@@ -207,11 +207,11 @@ def trainNB0(trainMatrix, trainCategory):
     :param trainCategory: 训练样本对应的标签
     :return: p0Vec: 非垃圾词汇的概率
              p1Vec: 垃圾词汇的概率
-             pAbusive: 垃圾邮件的概率
+             pAbusive: 垃圾短信的概率
     """
     numTrainDocs = len(trainMatrix)  # 文档个数
     numWords = len(trainMatrix[0])  # 单词个数
-    pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾邮件的概率
+    pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾短信的概率
     # 初始化概率
     # 拉普拉斯平滑
     p0Num = np.ones(numWords)
@@ -219,14 +219,14 @@ def trainNB0(trainMatrix, trainCategory):
     p0Denom = numWords
     p1Denom = numWords
 
-    # 遍历所有文档，统计每个单词在垃圾邮件和非垃圾邮件中出现的次数
+    # 遍历所有文档，统计每个单词在垃圾短信和非垃圾短信中出现的次数
     for i in range(numTrainDocs):
         if trainCategory[i]:
             # 向量相加
-            p1Num += trainMatrix[i]  # 垃圾邮件中出现该词的次数
+            p1Num += trainMatrix[i]  # 垃圾短信中出现该词的次数
             p1Denom += sum(trainMatrix[i])
         else:
-            p0Num += trainMatrix[i]  # 非垃圾邮件中出现该词的次数
+            p0Num += trainMatrix[i]  # 非垃圾短信中出现该词的次数
             p0Denom += sum(trainMatrix[i])
     # 对每个元素做除法求概率，为了避免下溢出的影响，对计算结果取自然对数
     p1Vect = np.log(p1Num / p1Denom)
@@ -240,16 +240,16 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     :param vec2Classify: 待分类的文本向量
     :param p0Vec: 非垃圾词汇的概率
     :param p1Vec: 垃圾词汇的概率
-    :param pClass1: 垃圾邮件的概率
+    :param pClass1: 垃圾短信的概率
     :return: 分类结果
     """
     # 元素相乘
     p1 = sum(vec2Classify * p1Vec) + np.log(pClass1)
     p0 = sum(vec2Classify * p0Vec) + np.log(1.0 - pClass1)
     if p1 > p0:
-        return 1  # 垃圾邮件
+        return 1  # 垃圾信息
     else:
-        return 0  # 正常邮件
+        return 0  # 正常信息
 
 
 def testingNB():
