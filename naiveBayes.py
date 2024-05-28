@@ -69,38 +69,33 @@ def setOfWords2Vec(vocabList, inputSet):
             returnVec[vocabList.index(word)] = 1
     return returnVec
 
-def trainNB0(trainMatrix, trainCategory):
-    """
-    朴素贝叶斯分类器训练函数
-    :param trainMatrix: 由文本向量组成的矩阵
-    :param trainCategory: 训练样本对应的标签
-    :return: p0Vec: 非垃圾词汇的概率
-             p1Vec: 垃圾词汇的概率
-             pAbusive: 垃圾短信的概率
-    """
-    numTrainDocs = len(trainMatrix)  # 文档个数
-    numWords = len(trainMatrix[0])  # 单词个数
-    pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾短信的概率
-    # 初始化概率
-    # 拉普拉斯平滑
-    p0Num = np.ones(numWords)
-    p1Num = np.ones(numWords)
-    p0Denom = numWords
-    p1Denom = numWords
 
-    # 遍历所有文档，统计每个单词在垃圾短信和非垃圾短信中出现的次数
+def trainNB0(trainMatrix, trainCategory):
+    numTrainDocs = len(trainMatrix)
+    if isinstance(trainMatrix, pd.DataFrame):
+        numWords = len(trainMatrix.columns)
+    else:
+        numWords = len(trainMatrix[0])
+
+    pAbusive = sum(trainCategory) / float(numTrainDocs)
+    p0Num = np.ones(numWords);
+    p1Num = np.ones(numWords)
+    p0Denom = 2.0;
+    p1Denom = 2.0
+
     for i in range(numTrainDocs):
-        if trainCategory[i]:
-            # 向量相加
-            p1Num += trainMatrix[i]  # 垃圾短信中出现该词的次数
-            p1Denom += sum(trainMatrix[i])
+        if trainCategory[i] == 1:
+            p1Num += trainMatrix.iloc[i] if isinstance(trainMatrix, pd.DataFrame) else trainMatrix[i]
+            p1Denom += sum(trainMatrix.iloc[i]) if isinstance(trainMatrix, pd.DataFrame) else sum(trainMatrix[i])
         else:
-            p0Num += trainMatrix[i]  # 非垃圾短信中出现该词的次数
-            p0Denom += sum(trainMatrix[i])
-    # 对每个元素做除法求概率，为了避免下溢出的影响，对计算结果取自然对数
+            p0Num += trainMatrix.iloc[i] if isinstance(trainMatrix, pd.DataFrame) else trainMatrix[i]
+            p0Denom += sum(trainMatrix.iloc[i]) if isinstance(trainMatrix, pd.DataFrame) else sum(trainMatrix[i])
+
     p1Vect = np.log(p1Num / p1Denom)
     p0Vect = np.log(p0Num / p0Denom)
+
     return p0Vect, p1Vect, pAbusive
+
 
 def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     """
