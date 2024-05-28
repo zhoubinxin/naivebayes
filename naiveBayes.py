@@ -3,12 +3,10 @@ import re
 
 import nltk
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from nltk.corpus import stopwords
 
 
-# 词表到向量的转换函数
 def loadDataSet():
     """
     读取数据
@@ -32,12 +30,13 @@ def loadDataSet():
             classVec.append(1)
 
         # 将每条短信拆分为单词列表
-        words = re.split(r'\W+', item[1])
+        words = re.findall(r'\b\w+\b', item[1])
         # 移除空字符串并转换为小写，移除停用词
-        words = [word.lower() for word in words if word != '' and word.lower() not in stop_words]
+        words = [word.lower() for word in words if word.lower() not in stop_words]
         postingList.append(words)
 
     return postingList, classVec
+
 
 def loadTestDataSet():
     postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
@@ -100,24 +99,38 @@ def bagOfWords2VecMN(vocabList, inputSet):
     return returnVec
 
 
-def bagOfWords2VecTFIDF(vocabList, inputSet, postingList):
+def computeIDF(postingList):
     """
-    使用TF-IDF进行特征的权重修正的词袋模型
-    :param postingList:
+    计算逆文档频率 IDF
+    :param postingList: 文档列表
+    :return: idfDict: 包含每个单词的IDF值的词典
+    """
+    numDocs = len(postingList)
+    idfDict = {}
+    for document in postingList:
+        for word in set(document):
+            idfDict[word] = idfDict.get(word, 0) + 1
+    for word in idfDict:
+        idfDict[word] = np.log(numDocs / (1 + idfDict[word]))
+    return idfDict
+
+
+def bagOfWords2VecTFIDF(vocabList, inputSet, idfDict):
+    """
+    TF-IDF算法实现
     :param vocabList:
     :param inputSet:
+    :param idfDict:
     :return:
     """
-
+    vocabDict = {word: idx for idx, word in enumerate(vocabList)}
     returnVec = [0] * len(vocabList)
     for word in inputSet:
-        if word in vocabList:
-            wordIndex = vocabList.index(word)
-            tf = calcTF(word, inputSet)
-            idf = calcIDF(word, postingList)
+        if word in vocabDict:
+            wordIndex = vocabDict[word]
+            tf = inputSet.count(word) / len(inputSet)
+            idf = idfDict.get(word, 0)
             returnVec[wordIndex] = tf * idf
-
-    returnVec = normalize(returnVec)
     return returnVec
 
 
@@ -146,6 +159,7 @@ def normalize(vec):
     if maxVal == minVal:  # 避免除以0的情况
         return vec
     return [(x - minVal) / (maxVal - minVal) for x in vec]
+
 
 def trainNB0(trainMatrix, trainCategory):
     """
@@ -205,10 +219,6 @@ def testingNB():
     :return: 输出测试结果
     """
     listOPosts, listClasses = loadDataSet()
-    # 保存listOPosts
-    print(listOPosts)
-    df = pd.DataFrame(listOPosts)
-    df.to_csv('./data/listOPosts.csv', index=False)
     myVocabList = createVocabList(listOPosts)
     trainMat = []
     for postinDoc in listOPosts:
@@ -223,18 +233,6 @@ def testingNB():
 
 
 def main():
-    # listOposts, listClasses = loadDataSet()
-    # listOposts, listClasses = loadTestDataSet()
-    # myVocabList = createVocabList(listOposts)
-    # trainMat = []
-    # for postinDoc in tqdm(listOposts):
-    #     trainMat.append(setOfWords2Vec(myVocabList, postinDoc))
-    #
-    # print(trainMat)
-    # p0V, p1V, pAb = trainNB0(trainMat, listClasses)
-    # print(pAb)
-    # print(p0V)
-    # print(p1V)
     testingNB()
 
 

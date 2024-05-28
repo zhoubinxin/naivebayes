@@ -17,10 +17,11 @@ def main():
 
     # 构建词向量矩阵
     trainMat = []
+    # idfDict = nb.computeIDF(listOposts)
     for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
         trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
         # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
-        # trainMat.append(nb.bagOfWords2VecTFIDF(myVocabList, postinDoc, listOposts))
+        # trainMat.append(nb.bagOfWords2VecTFIDF(myVocabList, postinDoc, idfDict))
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的

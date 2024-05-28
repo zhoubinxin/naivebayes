@@ -15,10 +15,10 @@ CountVectorizer类的参数很多，分为三个处理步骤：preprocessing、t
 
 一般要设置的参数是:ngram_range,max_df，min_df，max_features等，具体情况具体分析
 
-![img_1.png](img_1.png)
-![img_2.png](img_2.png)
-![img_3.png](img_3.png)
-![img_4.png](img_4.png)
+![img_1.png](../img/img_1.png)
+![img_2.png](../img/img_2.png)
+![img_3.png](../img/img_3.png)
+![img_4.png](../img/img_4.png)
 
 用数据输入形式为列表，列表元素为代表文章的字符串，一个字符串代表一篇文章，字符串是已经分割好的。CountVectorizer同样适用于中文;
 CountVectorizer是通过fit_transform函数将文本中的词语转换为词频矩阵，矩阵元素a[i][j] 表示j词在第i个文本下的词频。即各个词语出现的次数，通过get_feature_names()可看到所有文本的关键字，通过toarray()可看到词频矩阵的结果。
