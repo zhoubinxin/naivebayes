@@ -1,6 +1,9 @@
 import jieba
-import multiprocessing as mp
+
 from itertools import islice
+
+import numpy as np
+import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
@@ -36,6 +39,32 @@ def loadDataSet(stop_words, lines=5000):
             else:
                 print(f"警告：数据行格式不正确，已跳过。原始行: '{item}'")
     return postingList, classVec
+
+def trainNB1(trainMatrix, trainCategory):
+    numTrainDocs = len(trainMatrix)
+    if isinstance(trainMatrix, pd.DataFrame):
+        numWords = len(trainMatrix.columns)
+    else:
+        numWords = len(trainMatrix[0])
+
+    pAbusive = sum(trainCategory) / float(numTrainDocs)
+    p0Num = np.ones(numWords);
+    p1Num = np.ones(numWords)
+    p0Denom = 2.0;
+    p1Denom = 2.0
+
+    for i in range(numTrainDocs):
+        if trainCategory[i] == 1:
+            p1Num += trainMatrix.iloc[i] if isinstance(trainMatrix, pd.DataFrame) else trainMatrix[i]
+            p1Denom += sum(trainMatrix.iloc[i]) if isinstance(trainMatrix, pd.DataFrame) else sum(trainMatrix[i])
+        else:
+            p0Num += trainMatrix.iloc[i] if isinstance(trainMatrix, pd.DataFrame) else trainMatrix[i]
+            p0Denom += sum(trainMatrix.iloc[i]) if isinstance(trainMatrix, pd.DataFrame) else sum(trainMatrix[i])
+
+    p1Vect = np.log(p1Num / p1Denom)
+    p0Vect = np.log(p0Num / p0Denom)
+
+    return p0Vect, p1Vect, pAbusive
 
 def grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid):
     """

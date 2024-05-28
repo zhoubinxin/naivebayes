@@ -5,13 +5,12 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import multiprocessing as mp
 from itertools import repeat
-
-from naiveBayes import trainNB0
+from naiveBayesCN import trainNB1
 
 
 def main():
     stop_words = nbcn.load_stop_words()
-    lines = 50000
+    lines = 5000
     listOposts, listClasses = nbcn.loadDataSet(stop_words, lines)
 
     with mp.Pool(mp.cpu_count()) as pool:
@@ -36,11 +35,12 @@ def main():
 
     X_test_vec = X_test_vec.reindex(columns=X_train_vec.columns, fill_value=0)
 
-    p0V, p1V, pAb = trainNB0(X_train_vec, y_train)
+    p0V, p1V, pAb = trainNB1(X_train_vec, y_train)
     y_pred = [nbcn.classifyNB(vec, p0V, p1V, pAb) for vec in tqdm(X_test_vec.values, desc="分类测试集")]
 
     accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average='weighted')
+    precision = precision_score(y_test, y_pred, average='weighted', zero_division=1)
+
     recall = recall_score(y_test, y_pred, average='weighted')
     f1 = f1_score(y_test, y_pred, average='weighted')
 
