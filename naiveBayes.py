@@ -1,12 +1,14 @@
-# naiveBayes算法
 import re
-
 import nltk
 import numpy as np
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 from nltk.corpus import stopwords
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from itertools import product
 
-
+# 词表到向量的转换函数
 def loadDataSet():
     """
     读取数据
@@ -30,24 +32,12 @@ def loadDataSet():
             classVec.append(1)
 
         # 将每条短信拆分为单词列表
-        words = re.findall(r'\b\w+\b', item[1])
+        words = re.split(r'\W+', item[1])
         # 移除空字符串并转换为小写，移除停用词
-        words = [word.lower() for word in words if word.lower() not in stop_words]
+        words = [word.lower() for word in words if word != '' and word.lower() not in stop_words]
         postingList.append(words)
 
     return postingList, classVec
-
-
-def loadTestDataSet():
-    postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
-                   ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
-                   ['my', 'dalmation', 'is', 'so', 'cute', 'I', 'love', 'him'],
-                   ['stop', 'posting', 'stupid', 'worthless', 'garbage'],
-                   ['mr', 'licks', 'ate', 'my', 'steak', 'how', 'to', 'stop', 'him'],
-                   ['quit', 'buying', 'worthless', 'dog', 'food', 'stupid']]
-    classVec = [0, 1, 0, 1, 0, 1]  # 1 代表侮辱性文字，0 代表正常言论
-    return postingList, classVec
-
 
 def createVocabList(dataSet):
     """
@@ -61,7 +51,6 @@ def createVocabList(dataSet):
         # 创建两个集合的并集
         vocabSet = vocabSet | set(document)
     return list(vocabSet)
-
 
 def setOfWords2Vec(vocabList, inputSet):
     """
@@ -78,88 +67,7 @@ def setOfWords2Vec(vocabList, inputSet):
         if word in vocabList:
             # 如果词表中的单词在输入文档中出现，则将returnVec中对应位置的值设为1
             returnVec[vocabList.index(word)] = 1
-        else:
-            print(f"the word: {word} is not in my Vocabulary!")
     return returnVec
-
-
-def bagOfWords2VecMN(vocabList, inputSet):
-    """
-    词袋到向量的转换
-    :param vocabList: 词袋
-    :param inputSet: 文档
-    :return: returnVec: 文档向量
-    """
-    # 和词集模型相比，词袋模型会考虑词条出现的次数
-    returnVec = [0] * len(vocabList)
-    for word in inputSet:
-        # 如果文档中的单词在词汇表中，则相应向量位置加1
-        if word in vocabList:
-            returnVec[vocabList.index(word)] += 1
-    return returnVec
-
-
-def computeIDF(postingList):
-    """
-    计算逆文档频率 IDF
-    :param postingList: 文档列表
-    :return: idfDict: 包含每个单词的IDF值的词典
-    """
-    numDocs = len(postingList)
-    idfDict = {}
-    for document in postingList:
-        for word in set(document):
-            idfDict[word] = idfDict.get(word, 0) + 1
-    for word in idfDict:
-        idfDict[word] = np.log(numDocs / (1 + idfDict[word]))
-    return idfDict
-
-
-def bagOfWords2VecTFIDF(vocabList, inputSet, idfDict):
-    """
-    TF-IDF算法实现
-    :param vocabList:
-    :param inputSet:
-    :param idfDict:
-    :return:
-    """
-    vocabDict = {word: idx for idx, word in enumerate(vocabList)}
-    returnVec = [0] * len(vocabList)
-    for word in inputSet:
-        if word in vocabDict:
-            wordIndex = vocabDict[word]
-            tf = inputSet.count(word) / len(inputSet)
-            idf = idfDict.get(word, 0)
-            returnVec[wordIndex] = tf * idf
-    return returnVec
-
-
-def calcTF(word, inputSet):
-    """
-    计算词频 TF
-    """
-    return inputSet.count(word) / len(inputSet)
-
-
-def calcIDF(word, docList):
-    """
-    计算逆文档频率 IDF
-    """
-    numDocsContainingWord = sum([1 for doc in docList if word in doc])
-    return np.log(len(docList) / (1 + numDocsContainingWord))
-
-
-def normalize(vec):
-    """
-    将向量标准化
-    """
-    minVal = min(vec)
-    maxVal = max(vec)
-
-    if maxVal == minVal:  # 避免除以0的情况
-        return vec
-    return [(x - minVal) / (maxVal - minVal) for x in vec]
-
 
 def trainNB0(trainMatrix, trainCategory):
     """
@@ -194,7 +102,6 @@ def trainNB0(trainMatrix, trainCategory):
     p0Vect = np.log(p0Num / p0Denom)
     return p0Vect, p1Vect, pAbusive
 
-
 def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     """
     朴素贝叶斯分类函数
@@ -212,29 +119,42 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     else:
         return 0  # 正常信息
 
-
-def testingNB():
+def grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid):
     """
-    测试朴素贝叶斯分类器
-    :return: 输出测试结果
+    手动实现的参数搜索函数
+    :param X_train: 训练数据
+    :param y_train: 训练标签
+    :param X_test: 测试数据
+    :param y_test: 测试标签
+    :param param_grid: 参数网格
+    :return: 最佳参数和对应的模型性能
     """
-    listOPosts, listClasses = loadDataSet()
-    myVocabList = createVocabList(listOPosts)
-    trainMat = []
-    for postinDoc in listOPosts:
-        trainMat.append(setOfWords2Vec(myVocabList, postinDoc))
-    p0V, p1V, pAb = trainNB0(trainMat, listClasses)
-    testEntry = ['love', 'my', 'dalmation']
-    thisDoc = setOfWords2Vec(myVocabList, testEntry)
-    print(testEntry, 'calssified as: ', classifyNB(thisDoc, p0V, p1V, pAb))
-    testEntry = ['stupid', 'garbage']
-    thisDoc = setOfWords2Vec(myVocabList, testEntry)
-    print(testEntry, 'calssified as: ', classifyNB(thisDoc, p0V, p1V, pAb))
+    best_score = 0
+    best_params = None
 
+    for params in tqdm(list(product(*param_grid.values())), desc='参数搜索'):
+        max_df, alpha = params
+        vectorizer = CountVectorizer(max_df=max_df)
+        X_train_vec = vectorizer.fit_transform(X_train).toarray()
+        X_test_vec = vectorizer.transform(X_test).toarray()
 
-def main():
-    testingNB()
+        p0V, p1V, pAb = trainNB0(X_train_vec, y_train)
+        y_pred = [classifyNB(vec, p0V, p1V, pAb) for vec in X_test_vec]
 
+        accuracy = accuracy_score(y_test, y_pred)
+        if accuracy > best_score:
+            best_score = accuracy
+            best_params = {'max_df': max_df, 'alpha': alpha}
 
-if __name__ == '__main__':
-    main()
+    return best_params, best_score
+
+def preprocess_doc(args):
+    doc, stop_words = args
+    words = re.split(r'\W+', doc)
+    words = [word.lower() for word in words if word != '' and word.lower() not in stop_words]
+    return ' '.join(words)
+
+def load_stop_words():
+    nltk.download('stopwords')
+    stop_words = set(stopwords.words('english'))
+    return stop_words
