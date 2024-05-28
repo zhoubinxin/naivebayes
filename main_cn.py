@@ -1,14 +1,10 @@
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.model_selection import GridSearchCV, train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import naiveBayesCN as nbcn
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.pipeline import Pipeline
-import nativeBayesCN as nbcn
+from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 import multiprocessing as mp
 from itertools import repeat
-from tqdm import tqdm
-
-import pandas as pd
 
 def main():
     # 加载停用词
@@ -24,31 +20,29 @@ def main():
             tqdm(pool.imap(nbcn.preprocess_doc, zip(listOposts, repeat(stop_words))),
                  total=len(listOposts), desc='预处理文档'))
 
-    # 定义模型与参数网格
-    param_grid = {
-        'count_vect__max_df': (0.5, 0.75, 1.0),
-        'gb_clf__learning_rate': (0.01, 0.1, 0.5),
-        'gb_clf__n_estimators': (50, 100, 200),
-    }
-    pipeline = Pipeline([
-        ('count_vect', CountVectorizer()),
-        ('gb_clf', GradientBoostingClassifier(random_state=1))
-    ])
-
     # 划分训练集和验证集
     X_train, X_test, y_train, y_test = train_test_split(preprocessed_docs, listClasses,
                                                         test_size=0.2, random_state=1)
 
-    # 使用GridSearchCV进行模型调优
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, n_jobs=-1, verbose=1)
-    grid_search.fit(X_train, y_train)
+    # 定义参数网格
+    param_grid = {
+        'max_df': [0.5, 0.75, 1.0],
+        'alpha': [1.0, 0.1, 0.01]
+    }
 
-    # 最佳参数
-    best_params = grid_search.best_params_
+    # 手动实现的参数搜索
+    best_params, best_score = nbcn.grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid)
+
     print(f"最佳参数: {best_params}")
+    print(f"最佳准确率: {best_score}")
 
     # 使用最佳参数的模型进行预测
-    y_pred = grid_search.predict(X_test)
+    vectorizer = CountVectorizer(max_df=best_params['max_df'])
+    X_train_vec = vectorizer.fit_transform(X_train).toarray()
+    X_test_vec = vectorizer.transform(X_test).toarray()
+
+    p0V, p1V, pAb = nbcn.trainNB0(X_train_vec, y_train)
+    y_pred = [nbcn.classifyNB(vec, p0V, p1V, pAb) for vec in tqdm(X_test_vec, desc="分类测试集")]
 
     # 评估
     accuracy = accuracy_score(y_test, y_pred)
@@ -68,7 +62,6 @@ def main():
         file.write(f"精确率: {precision}\n")
         file.write(f"召回率: {recall}\n")
         file.write(f"F1值: {f1}\n")
-
 
 if __name__ == '__main__':
     main()

@@ -1,7 +1,12 @@
 import jieba
 import multiprocessing as mp
 from itertools import islice
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics import accuracy_score
 from tqdm import tqdm
+from tqdm.contrib.itertools import product
+from naiveBayes import trainNB0, classifyNB
+
 
 def load_stop_words():
     """
@@ -31,6 +36,35 @@ def loadDataSet(stop_words, lines=5000):
             else:
                 print(f"警告：数据行格式不正确，已跳过。原始行: '{item}'")
     return postingList, classVec
+
+def grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid):
+    """
+    手动实现的参数搜索函数
+    :param X_train: 训练数据
+    :param y_train: 训练标签
+    :param X_test: 测试数据
+    :param y_test: 测试标签
+    :param param_grid: 参数网格
+    :return: 最佳参数和对应的模型性能
+    """
+    best_score = 0
+    best_params = None
+
+    for params in tqdm(list(product(*param_grid.values())), desc='参数搜索'):
+        max_df, alpha = params
+        vectorizer = CountVectorizer(max_df=max_df)
+        X_train_vec = vectorizer.fit_transform(X_train).toarray()
+        X_test_vec = vectorizer.transform(X_test).toarray()
+
+        p0V, p1V, pAb = trainNB0(X_train_vec, y_train)
+        y_pred = [classifyNB(vec, p0V, p1V, pAb) for vec in X_test_vec]
+
+        accuracy = accuracy_score(y_test, y_pred)
+        if accuracy > best_score:
+            best_score = accuracy
+            best_params = {'max_df': max_df, 'alpha': alpha}
+
+    return best_params, best_score
 
 def preprocess_doc(args):
     """
