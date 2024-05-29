@@ -1,6 +1,5 @@
 import json
 
-import pandas as pd
 from mlxtend.evaluate import accuracy_score
 from sklearn.metrics import precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
@@ -11,21 +10,21 @@ import naiveBayes as nb
 
 def main():
     # 加载数据集
-    listOposts, listClasses = nb.loadDataSet()
+    docs, label = nb.loadDataSet()
     # 创建词汇表
-    myVocabList = nb.createVocabList(listOposts)
+    myVocabList = nb.createVocabList(docs)
 
     # 构建词向量矩阵
     trainMat = []
-    # idfDict = nb.computeIDF(listOposts)
-    for postinDoc in tqdm(listOposts, desc='构建词向量矩阵'):
+    for postinDoc in tqdm(docs, desc='构建词向量矩阵'):
         trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
         # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
+        tfidf = nb.TFIDF(myVocabList)
         # trainMat.append(nb.bagOfWords2VecTFIDF(myVocabList, postinDoc, idfDict))
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
-    X_train, X_test, y_train, y_test = train_test_split(trainMat, listClasses, test_size=0.2, random_state=1)
+    X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
     # 训练朴素贝叶斯分类器
     p0V, p1V, pAb = nb.trainNB0(X_train, y_train)
