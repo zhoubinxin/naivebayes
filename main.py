@@ -12,15 +12,15 @@ def main():
     # 加载数据集
     docs, label = nb.loadDataSet()
     # 创建词汇表
-    myVocabList = nb.createVocabList(docs)
+    vocabList = nb.createVocabList(docs)
 
     # 构建词向量矩阵
     trainMat = []
-    for postinDoc in tqdm(docs, desc='构建词向量矩阵'):
-        trainMat.append(nb.setOfWords2Vec(myVocabList, postinDoc))
-        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, postinDoc))
-        tfidf = nb.TFIDF(myVocabList)
-        # trainMat.append(nb.bagOfWords2VecTFIDF(myVocabList, postinDoc, idfDict))
+    # for inputSet in tqdm(docs, desc='构建词向量矩阵'):
+        # trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
+        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, inputSet))
+    tfidf = nb.TFIDF(docs, vocabList)
+    trainMat = tfidf.calc_tfidf()
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
@@ -45,7 +45,7 @@ def main():
 
     # 构建json结果
     result = {
-        "vocabList": myVocabList,
+        "vocabList": vocabList,
         "p0V": p0V.tolist(),
         "p1V": p1V.tolist(),
         "pAb": pAb,

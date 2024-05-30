@@ -11,8 +11,8 @@ def loadDataSet():
     :return: postingList: 词条切分后的文档集合
              classVec: 类别标签
     """
-    postingList = []  # 存储文本
-    classVec = []  # 存储标签
+    docs = []  # 存储文本
+    label = []  # 存储标签
     with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
         dataSet = [line.strip().split('\t') for line in file.readlines()]
 
@@ -23,41 +23,41 @@ def loadDataSet():
         # ham -> 0：表示非垃圾短信
         # spam -> 1：表示垃圾短信
         if item[0] == 'ham':
-            classVec.append(0)
+            label.append(0)
         else:
-            classVec.append(1)
+            label.append(1)
 
         # 将每条短信拆分为单词列表
         words = re.findall(r'\b\w+\b', item[1])
         # 转换为小写，移除停用词
         words = [word.lower() for word in words if word.lower() not in stop_words]
-        postingList.append(words)
+        docs.append(words)
 
-    return postingList, classVec
+    return docs, label
 
 
 def loadTestDataSet():
-    postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
-                   ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
-                   ['my', 'dalmation', 'is', 'so', 'cute', 'I', 'love', 'him'],
-                   ['stop', 'posting', 'stupid', 'worthless', 'garbage'],
-                   ['mr', 'licks', 'ate', 'my', 'steak', 'how', 'to', 'stop', 'him'],
-                   ['quit', 'buying', 'worthless', 'dog', 'food', 'stupid']]
-    classVec = [0, 1, 0, 1, 0, 1]  # 1 代表侮辱性文字，0 代表正常言论
-    return postingList, classVec
+    docs = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
+            ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
+            ['my', 'dalmation', 'is', 'so', 'cute', 'I', 'love', 'him'],
+            ['stop', 'posting', 'stupid', 'worthless', 'garbage'],
+            ['mr', 'licks', 'ate', 'my', 'steak', 'how', 'to', 'stop', 'him'],
+            ['quit', 'buying', 'worthless', 'dog', 'food', 'stupid']]
+    label = [0, 1, 0, 1, 0, 1]  # 1 代表侮辱性文字，0 代表正常言论
+    return docs, label
 
 
-def createVocabList(dataSet):
+def createVocabList(docs):
     """
     提取数据集中的单词列表，去除重复的单词
-    :param dataSet: 数据集
+    :param docs: 文档集合
     :return: list(vocabSet)：返回一个包含所有文档中出现的不重复词的列表
     """
     # 创建一个空集
-    vocabSet = set([])
-    for document in tqdm(dataSet, desc='创建词表'):
+    vocabSet = set()
+    for doc in tqdm(docs, desc='创建词表'):
         # 创建两个集合的并集
-        vocabSet = vocabSet | set(document)
+        vocabSet.update(doc)
     return list(vocabSet)
 
 
@@ -95,71 +95,70 @@ def bagOfWords2VecMN(vocabList, inputSet):
     return returnVec
 
 
-# TF-IDF
 class TFIDF(object):
-    def __init__(self, postingList):
-        # 文档列表
-        self.postingList = postingList
+    def __init__(self, docs, vocabList):
+        self.docs = docs
+        self.vocabList = vocabList
 
-    def computeIDF(self):
+    def calc_tf(self):
+        """
+        计算词频 TF
+        :return: tfDicts: 包含每个文档的TF词典的列表
+        """
+        tfList = []
+        for doc in tqdm(self.docs, desc='计算TF'):
+            tfDoc = [0] * len(self.vocabList)
+            word_count = len(doc)
+            if word_count == 0:
+                tfList.append(tfDoc)
+                continue
+            for word in doc:
+                if word in self.vocabList:
+                    index = self.vocabList.index(word)
+                    tfDoc[index] += 1
+            # 将每个词的频数除以文档中的总词数，得到词频
+            tfDoc = [count / word_count for count in tfDoc]
+            tfList.append(tfDoc)
+        return tfList
+
+    def calc_idf(self):
         """
         计算逆文档频率 IDF
         :return: idfDict: 包含每个单词的IDF值的词典
         """
-        numDocs = len(self.postingList)
-        idfDict = {}
+        numDocs = len(self.docs)
+        idfList = [0] * len(self.vocabList)
 
-        for document in self.postingList:
-            for word in set(document):
-                idfDict[word] = idfDict.get(word, 0) + 1
+        for doc in tqdm(self.docs, desc='计算IDF'):
+            unique_words = set(doc)
+            for word in unique_words:
+                if word in self.vocabList:
+                    index = self.vocabList.index(word)
+                    idfList[index] += 1
 
-        for word in idfDict.items():
-            idfDict[word] = np.log(numDocs / (1 + idfDict[word]))
+        # 计算每个单词的IDF值
+        idfList = [np.log(numDocs / (1 + count)) for count in idfList]
+        return idfList
 
-        return idfDict
-
-    def get_tf(self, word, inputSet):
-        """
-        计算词频 TF
-        :param word: 单词
-        :param inputSet: 输入文档
-        :return: 词频
-        """
-        return inputSet.count(word) / len(inputSet)
-
-    def get_idf(self, word, docList):
-        """
-        计算逆文档频率 IDF
-        :param word: 单词
-        :param docList: 文档列表
-        :return: 逆文档频率
-        """
-        numDocsContainingWord = sum([1 for doc in docList if word in doc])
-        return np.log(len(docList) / (1 + numDocsContainingWord))
-
-    def get_tfidf(self, vocabList, inputSet, idfDict):
+    def calc_tfidf(self):
         """
         TF-IDF算法实现
-        :param vocabList: 词汇表
-        :param inputSet: 输入文档
-        :param idfDict: IDF词典
         :return: returnVec: 文档向量
         """
-        vocabDict = {word: idx for idx, word in enumerate(vocabList)}
-        returnVec = [0] * len(vocabList)
+        tfList = self.calc_tf()
+        idfList = self.calc_idf()
+        tfidfList = []
 
-        for word in inputSet:
-            if word in vocabDict:
-                wordIndex = vocabDict[word]
-                tf = inputSet.count(word) / len(inputSet)
-                idf = idfDict.get(word, 0)
-                returnVec[wordIndex] = tf * idf
+        for tfDoc in tqdm(tfList, desc='计算TF-IDF'):
+            tfidfDoc = [tf * idf for tf, idf in zip(tfDoc, idfList)]
+            tfidfDoc = self.mm(tfidfDoc)
+            tfidfList.append(tfidfDoc)
 
-        return returnVec
+        return tfidfList
 
-    def normalize(self, vec):
+    def mm(self, vec):
         """
-        归一化向量
+        归一化向量 使得某一个特征对最终结果不会造成更大的影响
         :param vec: 向量
         :return: 归一化后的向量
         """
@@ -168,7 +167,14 @@ class TFIDF(object):
 
         if maxVal == minVal:  # 避免除以0的情况
             return vec
-        return [(x - minVal) / (maxVal - minVal) for x in vec]
+
+        mx = 1
+        mi = 0
+        data = []
+        for x in vec:
+            X = (x - minVal) / (maxVal - minVal)
+            data.append(X * (mx - mi) + mi)
+        return data
 
 
 def trainNB0(trainMatrix, trainCategory):
@@ -223,31 +229,22 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
         return 0  # 正常信息
 
 
-def preprocess_doc(args):
-    doc, stop_words = args
-    words = re.split(r'\W+', doc)
-    words = [word.lower() for word in words if word != '' and word.lower() not in stop_words]
-    return ' '.join(words)
-
-
 def testingNB():
     """
     测试朴素贝叶斯分类器
     :return: 输出测试结果
     """
-    listOPosts, listClasses = loadTestDataSet()
-    print(listOPosts, listClasses)
-    myVocabList = createVocabList(listOPosts)
+    docs, label = loadTestDataSet()
+    vocabList = createVocabList(docs)
+    tfidf = TFIDF(docs, vocabList)
     trainMat = []
-    for postinDoc in listOPosts:
-        trainMat.append(setOfWords2Vec(myVocabList, postinDoc))
+    # for postinDoc in docs:
+    #     trainMat.append(setOfWords2Vec(vocabList, postinDoc))
+    trainMat = tfidf.calc_tfidf()
     print(trainMat)
-    p0V, p1V, pAb = trainNB0(trainMat, listClasses)
+    p0V, p1V, pAb = trainNB0(trainMat, label)
     testEntry = ['love', 'my', 'dalmation']
-    thisDoc = setOfWords2Vec(myVocabList, testEntry)
-    print(testEntry, 'calssified as: ', classifyNB(thisDoc, p0V, p1V, pAb))
-    testEntry = ['stupid', 'garbage']
-    thisDoc = setOfWords2Vec(myVocabList, testEntry)
+    thisDoc = setOfWords2Vec(vocabList, testEntry)
     print(testEntry, 'calssified as: ', classifyNB(thisDoc, p0V, p1V, pAb))
 
 
