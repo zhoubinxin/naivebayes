@@ -3,12 +3,19 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import networkx as nx
+import matplotlib.pyplot as plt
 
 import naiveBayes as nb
 
 
 def compute_mutual_information(X):
-    n_features = X.shape[1]
+    """
+    计算数据集中每对特征之间的互信息，并构建互信息矩阵。
+    :param X:
+    :return:
+    """
+    n_features = X.shape[1]  # 特征数量
     mi_matrix = np.zeros((n_features, n_features))
 
     # 计算每对特征之间的互信息
@@ -37,7 +44,7 @@ def mutual_information(x, y):
 
 
 # 使用Prim算法构建最大权重生成树
-def prim_algorithm(mi_matrix):
+def prim_algorithm(mi_matrix, vocabList):
     n_features = mi_matrix.shape[0]
     selected_nodes = [0]  # 初始化包含第一个节点
     edges = []
@@ -45,25 +52,41 @@ def prim_algorithm(mi_matrix):
     # 进度条
     with tqdm(total=n_features - 1, desc="构建树") as pbar:
         while len(selected_nodes) < n_features:
-            max_weight = -np.inf
-            new_edge = None
+            max_weight = -np.inf  # 初始化最大权重为负无穷
+            new_edge = None  # 用于存储找到的新的边
             for i in selected_nodes:
                 for j in range(n_features):
-                    if j not in selected_nodes and mi_matrix[i, j] > max_weight:
+                    if j not in selected_nodes and mi_matrix[i, j] > max_weight:  # 如果j未被选中且权重大于当前最大权重
                         max_weight = mi_matrix[i, j]
                         new_edge = (i, j)
             edges.append(new_edge)
             selected_nodes.append(new_edge[1])
             pbar.update(1)
 
+    # 创建networkx图
+    G = nx.Graph()
+    G.add_edges_from(edges)
+
+    # 为每个节点设置标签
+    labels = {i: vocabList[i] for i in range(len(vocabList))}
+
+    # 绘制图
+    plt.figure(figsize=(8, 6))
+    pos = nx.spring_layout(G)  # 布局
+    nx.draw(G, pos, with_labels=True, labels=labels, node_size=500, node_color="lightblue", font_size=10,
+            font_weight="bold", edge_color="gray")
+    plt.title("最大权重生成树")
+    plt.show()
+
     return edges
 
 
 class TAN:
-    def __init__(self):
+    def __init__(self, vocabList):
         self.class_prior = {}  # 存储类的先验概率
         self.feature_probs = {}  # 存储特征的条件概率
         self.edges = []  # 存储树的边
+        self.vocabList = vocabList
 
     def fit(self, X, y):
         n_samples, n_features = X.shape  # 获取样本数和特征数
@@ -71,12 +94,12 @@ class TAN:
         self.class_prior = dict(zip(self.classes, counts / n_samples))  # 计算先验概率
 
         mi_matrix = compute_mutual_information(X)  # 计算互信息矩阵
-        self.edges = prim_algorithm(mi_matrix)  # 构建最大权重生成树
+        self.edges = prim_algorithm(mi_matrix, self.vocabList)  # 构建最大权重生成树
 
         self.feature_probs = {c: [{} for _ in range(n_features)] for c in self.classes}  # 初始化条件概率
         for c in tqdm(self.classes, desc="计算条件概率"):
             X_c = X[y == c]  # 获取属于类c的样本
-            X_c_df = pd.DataFrame(X_c)  # 转换为DataFrame以使用groupby方法
+            X_c_df = pd.DataFrame(X_c)
             for i in range(n_features):
                 parent = next((edge[0] for edge in self.edges if edge[1] == i), None)  # 找到特征i的父节点
                 if parent is None:
@@ -106,7 +129,7 @@ class TAN:
 # 示例用法
 if __name__ == "__main__":
     # 加载数据集
-    docs, label = nb.loadDataSet()
+    docs, label = nb.loadTestDataSet()
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
 
@@ -122,7 +145,7 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=42)
 
     # 训练模型
-    model = TAN()
+    model = TAN(vocabList)
     X_train = np.array(X_train)
     X_test = np.array(X_test)
     model.fit(X_train, y_train)
