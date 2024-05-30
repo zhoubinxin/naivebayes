@@ -1,7 +1,8 @@
 import json
 
+import numpy as np
 from mlxtend.evaluate import accuracy_score
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -17,33 +18,52 @@ def main():
     # 构建词向量矩阵
     trainMat = []
     # for inputSet in tqdm(docs, desc='构建词向量矩阵'):
-        # trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
-        # trainMat.append(nb.bagOfWords2VecMN(myVocabList, inputSet))
+    # trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
+    # trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
     tfidf = nb.TFIDF(docs, vocabList)
     trainMat = tfidf.calc_tfidf()
+
     # 将数据集划分为训练集和测试集
     # test_size 表示测试集的比例
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
-    # 训练朴素贝叶斯分类器
-    p0V, p1V, pAb = nb.trainNB0(X_train, y_train)
+    # 网格搜索
+    min_alpha = 10
+    max_alpha = 15
+    best_f1 = 0
+    best_alpha = None
+    best_metrics = None
 
-    # 预测测试集
-    y_pred = [nb.classifyNB(doc, p0V, p1V, pAb) for doc in X_test]
+    for alpha in np.arange(min_alpha, max_alpha, 1):
+        p0V, p1V, pAb = nb.trainNB0(X_train, y_train, alpha)
+        accuracy, precision, recall, f1, conf_matrix = nb.evaluate_model(p0V, p1V, pAb, X_test, y_test)
 
-    # 计算评估指标
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
+        print(f"Alpha: {alpha}")
+        print(f"Accuracy: {accuracy}")
+        print(f"Precision: {precision}")
+        print(f"Recall: {recall}")
+        print(f"F1 Score: {f1}")
+        print(f"Confusion Matrix:\n{conf_matrix}\n")
 
-    print(f"准确率: {accuracy}")
-    print(f"精确率: {precision}")
-    print(f"召回率: {recall}")
-    print(f"F1值: {f1}")
+        if f1 > best_f1:
+            best_f1 = f1
+            best_alpha = alpha
+            best_metrics = (accuracy, precision, recall, f1, conf_matrix)
 
-    # 构建json结果
+    print(f"Best Alpha: {best_alpha}")
+    print(f"""
+    Best Metrics
+    Accuracy: {best_metrics[0]}
+    Precision: {best_metrics[1]}
+    Recall: {best_metrics[2]}
+    F1 Score: {best_metrics[3]}
+    Confusion Matrix: \n{best_metrics[4]}
+    """)
+
+    # 训练最佳模型
+    p0V, p1V, pAb = nb.trainNB0(trainMat, label, best_alpha)
+
     result = {
         "vocabList": vocabList,
         "p0V": p0V.tolist(),
@@ -59,10 +79,14 @@ def main():
         # 评估指标
         # accuracy, precision, recall, f1
         file.write("\n评估指标:\n")
-        file.write(f'accuracy: {accuracy}\n')
-        file.write(f'precision: {precision}\n')
-        file.write(f'recall: {recall}\n')
-        file.write(f'f1: {f1}\n')
+        file.write(f'accuracy: {best_metrics[0]}\n')
+        file.write(f'precision: {best_metrics[1]}\n')
+        file.write(f'recall: {best_metrics[2]}\n')
+        file.write(f'f1: {best_metrics[3]}\n')
+
+        # 混淆矩阵
+        file.write("\nconf_matrix:\n")
+        file.write(str(best_metrics[4]) + '\n')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import re
 import nltk
 import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from tqdm import tqdm
 from nltk.corpus import stopwords
 
@@ -177,7 +178,7 @@ class TFIDF(object):
         return data
 
 
-def trainNB0(trainMatrix, trainCategory):
+def trainNB0(trainMatrix, trainCategory, alpha=0.1):
     """
     朴素贝叶斯分类器训练函数
     :param trainMatrix: 由文本向量组成的矩阵
@@ -193,8 +194,8 @@ def trainNB0(trainMatrix, trainCategory):
     # 拉普拉斯平滑
     p0Num = np.ones(numWords)
     p1Num = np.ones(numWords)
-    p0Denom = numWords
-    p1Denom = numWords
+    p0Denom = numWords * alpha
+    p1Denom = numWords * alpha
 
     # 遍历所有文档，统计每个单词在垃圾短信和非垃圾短信中出现的次数
     for i in range(numTrainDocs):
@@ -227,6 +228,25 @@ def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
         return 1  # 垃圾信息
     else:
         return 0  # 正常信息
+
+
+def evaluate_model(p0V, p1V, pAb, X_test_vec, y_test):
+    """
+    评估模型
+    :param p0V: 非垃圾词汇的概率
+    :param p1V: 垃圾词汇的概率
+    :param pAb: 垃圾短信的概率
+    :param X_test_vec: 测试样本
+    :param y_test: 测试样本对应的标签
+    :return:
+    """
+    y_pred = [classifyNB(vec, p0V, p1V, pAb) for vec in X_test_vec]
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    return accuracy, precision, recall, f1, conf_matrix
 
 
 def testingNB():

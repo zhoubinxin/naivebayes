@@ -21,6 +21,7 @@ def load_stop_words():
             stop_words.add(line.strip())
     return stop_words
 
+
 def loadDataSet(stop_words, lines=5000):
     """
     读取中文数据集并进行预处理
@@ -39,6 +40,7 @@ def loadDataSet(stop_words, lines=5000):
             else:
                 print(f"警告：数据行格式不正确，已跳过。原始行: '{item}'")
     return postingList, classVec
+
 
 def trainNB1(trainMatrix, trainCategory):
     numTrainDocs = len(trainMatrix)
@@ -65,6 +67,7 @@ def trainNB1(trainMatrix, trainCategory):
     p0Vect = np.log(p0Num / p0Denom)
 
     return p0Vect, p1Vect, pAbusive
+
 
 def grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid):
     """
@@ -95,12 +98,14 @@ def grid_search_naive_bayes(X_train, y_train, X_test, y_test, param_grid):
 
     return best_params, best_score
 
+
 def preprocess_doc(args):
     """
     单个文档预处理函数，用于多进程调用
     """
     doc, stop_words = args
     return ' '.join(jieba.lcut(doc, cut_all=False) if isinstance(doc, str) else doc)  # 预处理文档并返回处理后的文本字符串
+
 
 if __name__ == '__main__':
     # 测试nativeBayesCN
