@@ -1,12 +1,12 @@
 import json
 
 import numpy as np
-from mlxtend.evaluate import accuracy_score
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 import naiveBayes as nb
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 
 def main():
@@ -87,6 +87,15 @@ def main():
         # 混淆矩阵
         file.write("\nconf_matrix:\n")
         file.write(str(best_metrics[4]) + '\n')
+
+    # 创建词云对象
+    # wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(vocabList)
+
+    # 显示词云
+    # plt.figure()
+    # plt.imshow(wordcloud, interpolation="bilinear")
+    # plt.axis("off")
+    # plt.show()
 
 
 if __name__ == '__main__':
