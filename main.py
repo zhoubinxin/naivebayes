@@ -29,13 +29,13 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
     # 网格搜索
-    min_alpha = 10
-    max_alpha = 15
+    min_alpha = 2.1
+    max_alpha = 2.2
     best_f1 = 0
     best_alpha = None
     best_metrics = None
 
-    for alpha in np.arange(min_alpha, max_alpha, 1):
+    for alpha in np.arange(min_alpha, max_alpha, 0.1):
         p0V, p1V, pAb = nb.trainNB0(X_train, y_train, alpha)
         accuracy, precision, recall, f1, conf_matrix = nb.evaluate_model(p0V, p1V, pAb, X_test, y_test)
 

@@ -14,12 +14,16 @@ def loadDataSet():
     """
     docs = []  # 存储文本
     label = []  # 存储标签
-    with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
-        dataSet = [line.strip().split('\t') for line in file.readlines()]
+    try:
+        with open('./data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
+            dataSet = [line.strip().split('\t') for line in file.readlines()]
+    except:
+        # GitHub action
+        with open('naivebayes/data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
+            dataSet = [line.strip().split('\t') for line in file.readlines()]
 
     nltk.download('stopwords')
     stop_words = set(stopwords.words('english'))
-
     for item in tqdm(dataSet, desc='加载数据'):
         # ham -> 0：表示非垃圾短信
         # spam -> 1：表示垃圾短信
@@ -28,10 +32,14 @@ def loadDataSet():
         else:
             label.append(1)
 
+        # 数据预处理
+        text = re.sub('', "'", item[1])
+        text = text.lower()
+
         # 将每条短信拆分为单词列表
-        words = re.findall(r'\b\w+\b', item[1])
-        # 转换为小写，移除停用词
-        words = [word.lower() for word in words if word.lower() not in stop_words]
+        words = re.findall(r'\b\w+\b', text)
+        # 移除停用词
+        words = [word for word in words if word not in stop_words]
         docs.append(words)
 
     return docs, label
@@ -81,7 +89,7 @@ def setOfWords2Vec(vocabList, inputSet):
 
 
 def bagOfWords2VecMN(vocabList, inputSet):
-    """
+    """ji
     词袋模型
     :param vocabList: 词袋
     :param inputSet: 文档

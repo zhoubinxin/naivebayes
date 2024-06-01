@@ -1,20 +1,12 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, mutual_info_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-import networkx as nx
-import matplotlib.pyplot as plt
-
 import naiveBayes as nb
 
 
 def compute_mutual_information(X):
-    """
-    计算数据集中每对特征之间的互信息，并构建互信息矩阵。
-    :param X:
-    :return:
-    """
     n_features = X.shape[1]  # 特征数量
     mi_matrix = np.zeros((n_features, n_features))
 
@@ -22,15 +14,15 @@ def compute_mutual_information(X):
     with tqdm(total=n_features * (n_features - 1) // 2, desc="计算互信息") as pbar:
         for i in range(n_features):
             for j in range(i + 1, n_features):
-                mi_matrix[i, j] = mutual_information(X[:, i], X[:, j])
-                mi_matrix[j, i] = mi_matrix[i, j]
-
+                mi_matrix[i, j] = mutual_info_score(X[:, i], X[:, j])
                 pbar.update(1)
+
+    np.fill_diagonal(mi_matrix, [mutual_info_score(X[:, i], X[:, i]) for i in range(n_features)])
+    mi_matrix = mi_matrix + mi_matrix.T
 
     return mi_matrix
 
 
-# 计算两个特征之间的互信息
 def mutual_information(x, y):
     p_xy = pd.crosstab(x, y, normalize=True)  # 计算联合概率
     p_x = p_xy.sum(axis=1)  # 计算边际概率P(x)
@@ -43,7 +35,6 @@ def mutual_information(x, y):
     return mi
 
 
-# 使用Prim算法构建最大权重生成树
 def prim_algorithm(mi_matrix, vocabList):
     n_features = mi_matrix.shape[0]
     selected_nodes = [0]  # 初始化包含第一个节点
@@ -63,20 +54,24 @@ def prim_algorithm(mi_matrix, vocabList):
             selected_nodes.append(new_edge[1])
             pbar.update(1)
 
-    # 创建networkx图
-    G = nx.Graph()
-    G.add_edges_from(edges)
-
-    # 为每个节点设置标签
-    labels = {i: vocabList[i] for i in range(len(vocabList))}
-
-    # 绘制图
-    plt.figure(figsize=(8, 6))
-    pos = nx.spring_layout(G)  # 布局
-    nx.draw(G, pos, with_labels=True, labels=labels, node_size=500, node_color="lightblue", font_size=10,
-            font_weight="bold", edge_color="gray")
-    plt.title("最大权重生成树")
-    plt.show()
+    # # 创建networkx图
+    # G = nx.Graph()
+    # G.add_edges_from(edges)
+    #
+    # # 为每个节点设置标签
+    # labels = {i: vocabList[i] for i in range(len(vocabList))}
+    #
+    # # 设置字体
+    # rcParams['font.family'] = 'sans-serif'
+    # rcParams['font.sans-serif'] = ['SimHei']  # 使用黑体
+    #
+    # # 绘制图
+    # plt.figure(figsize=(8, 6))
+    # pos = nx.spring_layout(G)  # 布局
+    # nx.draw(G, pos, with_labels=True, labels=labels, node_size=500, node_color="lightblue", font_size=10,
+    #         font_weight="bold", edge_color="gray")
+    # plt.title("最大权重生成树")
+    # plt.show()
 
     return edges
 
@@ -126,23 +121,40 @@ class TAN:
         return self.classes[np.argmax(log_prob, axis=1)]  # 返回概率最大的类
 
 
+def cf_msg(message, method="qywx", webhook="H", type="text", worker_url="https://api.xbxin.com/msg", ):
+    # 构建POST请求的数据
+    data = {
+        "method": method,
+        "content": {
+            "webhook": webhook,
+            "type": type,
+            "message": message,
+        },
+    }
+
+    # 发送POST请求到Cloudflare Worker
+    response = requests.post(worker_url, json=data)
+
+    print(response.text)
+
+
 # 示例用法
 if __name__ == "__main__":
     # 加载数据集
-    docs, label = nb.loadTestDataSet()
+    docs, label = nb.loadDataSet()
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
-
+    vocabList = vocabList[0:2000]
     # 构建词向量矩阵
     trainMat = []
     for inputSet in tqdm(docs, desc='构建词向量矩阵'):
         trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
-        # trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
+    #     trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
     # tfidf = nb.TFIDF(docs, vocabList)
     # trainMat = tfidf.calc_tfidf()
 
     # 分割数据集为训练集和测试集
-    X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
     # 训练模型
     model = TAN(vocabList)
@@ -163,3 +175,6 @@ if __name__ == "__main__":
     print(f"Recall: {recall}")
     print(f"F1 Score: {f1}")
     print(f"Confusion Matrix:\n{conf_matrix}\n")
+
+    cf_msg(
+        f"Accuracy: {accuracy}\nPrecision: {precision}\nRecall: {recall}\nF1 Score: {f1}\nConfusion Matrix:\n{conf_matrix}")
