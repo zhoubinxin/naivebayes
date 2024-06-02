@@ -145,7 +145,7 @@ if __name__ == "__main__":
     docs, label = nb.loadDataSet()
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
-    vocabList = vocabList[0:2000]
+    vocabList = vocabList[0:1500]
     # 构建词向量矩阵
     trainMat = []
     for inputSet in tqdm(docs, desc='构建词向量矩阵'):
