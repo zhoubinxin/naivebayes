@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, mutual_info_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
