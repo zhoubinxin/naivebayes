@@ -1,6 +1,10 @@
+import heapq
+
+import networkx as nx
 import numpy as np
 import pandas as pd
 import requests
+from matplotlib import rcParams, pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, mutual_info_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
@@ -9,7 +13,7 @@ import naiveBayes as nb
 
 def compute_mutual_information(X):
     n_features = X.shape[1]  # 特征数量
-    mi_matrix = np.ones((n_features, n_features))
+    mi_matrix = np.zeros((n_features, n_features))
 
     # 计算每对特征之间的互信息
     with tqdm(total=n_features * (n_features - 1) // 2, desc="计算互信息") as pbar:
@@ -60,7 +64,7 @@ def prim_algorithm(mi_matrix):
 
             pbar.update(1)
 
-    # 创建networkx图
+    # # 创建networkx图
     # G = nx.Graph()
     # G.add_edges_from(edges)
     #
@@ -143,20 +147,26 @@ def cf_msg(message, method="qywx", webhook="H", type="text", worker_url="https:/
     print(response.text)
 
 
-# 示例用法
 if __name__ == "__main__":
     # 加载数据集
     docs, label = nb.loadDataSet()
+
+    # 确定子集
+    sample_size = min(1000, len(label))  # 设置样本子集的大小
+    subset_indices = np.random.choice(len(label), sample_size, replace=False)
+    docs = [docs[i] for i in subset_indices]
+    label = [label[i] for i in subset_indices]
+
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
-    # vocabList = vocabList[0:100]
+
     # 构建词向量矩阵
-    # trainMat = []
-    # for inputSet in tqdm(docs, desc='构建词向量矩阵'):
-    #     trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
+    trainMat = []
+    for inputSet in tqdm(docs, desc='构建词向量矩阵'):
+        trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
     #     trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
-    tfidf = nb.TFIDF(docs, vocabList)
-    trainMat = tfidf.calc_tfidf()
+    # tfidf = nb.TFIDF(docs, vocabList)
+    # trainMat = tfidf.calc_tfidf()
 
     # 分割数据集为训练集和测试集
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
