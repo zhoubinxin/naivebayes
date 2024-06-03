@@ -9,7 +9,7 @@ import naiveBayes as nb
 
 def compute_mutual_information(X):
     n_features = X.shape[1]  # 特征数量
-    mi_matrix = np.zeros((n_features, n_features))
+    mi_matrix = np.ones((n_features, n_features))
 
     # 计算每对特征之间的互信息
     with tqdm(total=n_features * (n_features - 1) // 2, desc="计算互信息") as pbar:
@@ -36,26 +36,31 @@ def mutual_information(x, y):
     return mi
 
 
-def prim_algorithm(mi_matrix, vocabList):
+def prim_algorithm(mi_matrix):
     n_features = mi_matrix.shape[0]
-    selected_nodes = [0]  # 初始化包含第一个节点
+    selected_nodes = {0}  # 使用集合来存储已选择的节点
     edges = []
+
+    # 初始化候选边集合，过滤掉权重为0的边
+    candidate_edges = [(0, j, mi_matrix[0, j]) for j in range(1, n_features) if mi_matrix[0, j] > 0]
 
     # 进度条
     with tqdm(total=n_features - 1, desc="构建树") as pbar:
         while len(selected_nodes) < n_features:
-            max_weight = -np.inf  # 初始化最大权重为负无穷
-            new_edge = None  # 用于存储找到的新的边
-            for i in selected_nodes:
-                for j in range(n_features):
-                    if j not in selected_nodes and mi_matrix[i, j] > max_weight:  # 如果j未被选中且权重大于当前最大权重
-                        max_weight = mi_matrix[i, j]
-                        new_edge = (i, j)
-            edges.append(new_edge)
-            selected_nodes.append(new_edge[1])
+            # 找到权重最大的边
+            new_edge = max(candidate_edges, key=lambda x: x[2])
+            candidate_edges.remove(new_edge)
+            edges.append((new_edge[0], new_edge[1]))
+            selected_nodes.add(new_edge[1])
+
+            # 更新候选边集合
+            for j in range(n_features):
+                if j not in selected_nodes and mi_matrix[new_edge[1], j] > 0:
+                    candidate_edges.append((new_edge[1], j, mi_matrix[new_edge[1], j]))
+
             pbar.update(1)
 
-    # # 创建networkx图
+    # 创建networkx图
     # G = nx.Graph()
     # G.add_edges_from(edges)
     #
@@ -76,7 +81,6 @@ def prim_algorithm(mi_matrix, vocabList):
 
     return edges
 
-
 class TAN:
     def __init__(self, vocabList):
         self.class_prior = {}  # 存储类的先验概率
@@ -90,7 +94,7 @@ class TAN:
         self.class_prior = dict(zip(self.classes, counts / n_samples))  # 计算先验概率
 
         mi_matrix = compute_mutual_information(X)  # 计算互信息矩阵
-        self.edges = prim_algorithm(mi_matrix, self.vocabList)  # 构建最大权重生成树
+        self.edges = prim_algorithm(mi_matrix)  # 构建最大权重生成树
 
         self.feature_probs = {c: [{} for _ in range(n_features)] for c in self.classes}  # 初始化条件概率
         for c in tqdm(self.classes, desc="计算条件概率"):
@@ -145,14 +149,14 @@ if __name__ == "__main__":
     docs, label = nb.loadDataSet()
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
-    vocabList = vocabList[0:1500]
+    # vocabList = vocabList[0:100]
     # 构建词向量矩阵
-    trainMat = []
-    for inputSet in tqdm(docs, desc='构建词向量矩阵'):
-        trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
+    # trainMat = []
+    # for inputSet in tqdm(docs, desc='构建词向量矩阵'):
+    #     trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
     #     trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
-    # tfidf = nb.TFIDF(docs, vocabList)
-    # trainMat = tfidf.calc_tfidf()
+    tfidf = nb.TFIDF(docs, vocabList)
+    trainMat = tfidf.calc_tfidf()
 
     # 分割数据集为训练集和测试集
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)

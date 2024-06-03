@@ -64,5 +64,6 @@ def main():
         file.write(f"召回率: {recall}\n")
         file.write(f"F1值: {f1}\n")
 
+
 if __name__ == '__main__':
     main()
