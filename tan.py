@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, mutual_info_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     docs, label = nb.loadDataSet()
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
-    vocabList = vocabList[0:2000]
+    vocabList = vocabList[0:500]
     # 构建词向量矩阵
     trainMat = []
     for inputSet in tqdm(docs, desc='构建词向量矩阵'):

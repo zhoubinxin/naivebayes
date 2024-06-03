@@ -40,9 +40,9 @@ def main():
         accuracy, precision, recall, f1, conf_matrix = nb.evaluate_model(p0V, p1V, pAb, X_test, y_test)
 
         print(f"Alpha: {alpha}")
-        print(f"Accuracy: {accuracy}")
-        print(f"Precision: {precision}")
-        print(f"Recall: {recall}")
+        print(f"准确率Accuracy: {accuracy}")
+        print(f"精确率Precision: {precision}")
+        print(f"召回率Recall: {recall}")
         print(f"F1 Score: {f1}")
         print(f"Confusion Matrix:\n{conf_matrix}\n")
 

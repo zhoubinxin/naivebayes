@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from tqdm import tqdm
 from nltk.corpus import stopwords
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from itertools import product
 
 
 def loadDataSet():
