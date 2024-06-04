@@ -12,7 +12,7 @@ from wordcloud import WordCloud
 
 def main():
     # 加载数据集
-    docs, label = nb.loadCNDataSet(10000)
+    docs, label = nb.loadCNDataSet(5000)
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
 

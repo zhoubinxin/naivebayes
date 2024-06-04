@@ -196,8 +196,10 @@ class TFIDF(object):
         idfList = self.calc_idf()
         tfidfList = []
 
+        idfArray = np.array(idfList)
         for tfDoc in tqdm(tfList, desc='计算TF-IDF'):
-            tfidfDoc = [tf * idf for tf, idf in zip(tfDoc, idfList)]
+            tfArray = np.array(tfDoc)
+            tfidfDoc = tfArray * idfArray
             tfidfDoc = self.mm(tfidfDoc)
             tfidfList.append(tfidfDoc)
 
