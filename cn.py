@@ -30,8 +30,8 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
     # 网格搜索
-    min_alpha = 0
-    max_alpha = 10
+    min_alpha = 2
+    max_alpha = 5
     best_f1 = 0
     best_alpha = None
     best_metrics = None
