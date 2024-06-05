@@ -1,21 +1,8 @@
 import jieba
 from itertools import islice
-import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import accuracy_score
-from tqdm import tqdm
+
 from tqdm.contrib.itertools import product
-from naiveBayes import trainNB0, classifyNB
-import re
-from collections import Counter
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.base import clone
-import numpy as np
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-from joblib import Parallel, delayed
-import itertools
-import os
+
 
 # 简单朴素贝叶斯分类器
 class SimpleNaiveBayes:
@@ -59,7 +46,7 @@ class SimpleCountVectorizer:
     def fit(self, raw_documents):
         vocab = {}
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
+            words = set(doc)  # 使用 jieba 分词
             for word in words:
                 if word not in vocab:
                     vocab[word] = len(vocab)
@@ -70,7 +57,7 @@ class SimpleCountVectorizer:
     def transform(self, raw_documents):
         rows = []
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
+            words = set(doc)  # 使用 jieba 分词
             row = [0] * len(self.vocabulary_)
             for word in words:
                 if word in self.vocabulary_:
@@ -81,6 +68,7 @@ class SimpleCountVectorizer:
     def fit_transform(self, raw_documents):
         self.fit(raw_documents)
         return self.transform(raw_documents)
+
 
 class SimpleTfidfVectorizer:
     def __init__(self):
@@ -93,7 +81,7 @@ class SimpleTfidfVectorizer:
         total_docs = len(raw_documents)
 
         for doc in raw_documents:
-            words = set(jieba.lcut(doc))  # 使用 jieba 分词
+            words = doc  # 使用 jieba 分词
             for word in words:
                 if word not in vocab:
                     vocab[word] = len(vocab)
@@ -111,7 +99,7 @@ class SimpleTfidfVectorizer:
     def transform(self, raw_documents):
         rows = []
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
+            words = doc  # 使用 jieba 分词
             row = [0] * len(self.vocabulary_)
             word_count = {}
             for word in words:
@@ -136,6 +124,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 import itertools
 import os
+
 
 class SimpleGridSearchCV:
     def __init__(self, estimator, param_grid, cv=5, n_jobs=-1):
@@ -189,15 +178,16 @@ class SimpleGridSearchCV:
                 file.write(f"Params: {result['params']}, Score: {result['score']}\n")
 
 
-def load_stop_words():
+def load_stop_words(filename):
     """
     加载停用词列表
     """
     stop_words = set()
-    with open('./data/cnsmss/stopWord.txt', 'r', encoding='utf-8') as file:
+    with open(f'./data/cnsmss/{filename}.txt', 'r', encoding='utf-8') as file:
         for line in file:
             stop_words.add(line.strip())
     return stop_words
+
 
 class SimpleHalvingGridSearchCV:
     def __init__(self, estimator, param_grid, cv=5, factor=3, min_resources='exhaust', n_jobs=-1):
@@ -254,7 +244,8 @@ class SimpleHalvingGridSearchCV:
     def _evaluate_params(self, params, X, y, n_resources):
         scores = []
         for fold in range(self.cv):
-            X_train, X_val, y_train, y_val = train_test_split(X[:n_resources], y[:n_resources], test_size=1 / self.cv, random_state=fold)
+            X_train, X_val, y_train, y_val = train_test_split(X[:n_resources], y[:n_resources], test_size=1 / self.cv,
+                                                              random_state=fold)
             model = self.estimator.set_params(**params)
             model.fit(X_train, y_train)
             scores.append(model.score(X_val, y_val))
@@ -274,7 +265,7 @@ class SimpleHalvingGridSearchCV:
                 f.write(f"Params: {result['params']}, Score: {result['score']}\n")
 
 
-def loadCNDataSet(lines):
+def loadCNDataSet(lines, stop_words):
     """
     读取中文数据集
     :return:
@@ -297,20 +288,14 @@ def loadCNDataSet(lines):
         # 将每条短信拆分为单词列表
         try:
             words = jieba.lcut(item[2], cut_all=False)
+            # 去除空格
+            words = [word for word in words if word != ' ' and word not in stop_words]
             docs.append(words)
         except IndexError as e:
             print('\n', e)
             pass
 
     return docs, label
-
-
-def preprocess_doc(args):
-    """
-    单个文档预处理函数，用于多进程调用
-    """
-    doc, stop_words = args
-    return ' '.join(jieba.lcut(doc, cut_all=False) if isinstance(doc, str) else doc)  # 预处理文档并返回处理后的文本字符串
 
 
 if __name__ == '__main__':
