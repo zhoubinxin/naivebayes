@@ -47,38 +47,6 @@ def loadDataSet():
 
     return docs, label
 
-
-def loadCNDataSet(lines=5000):
-    """
-    读取中文数据集
-    :return:
-    """
-    docs = []  # 存储文本
-    label = []  # 存储标签
-
-    try:
-        with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
-            dataSet = [line.strip().split('\t') for line in islice(file, lines)]
-    except:
-        # GitHub action
-        with open('naivebayes/data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
-            dataSet = [line.strip().split('\t') for line in islice(file, lines)]
-
-    for item in tqdm(dataSet, desc='加载数据集：'):
-        # 0：非垃圾短信；1：垃圾短信
-        label.append(int(item[1]))
-
-        # 将每条短信拆分为单词列表
-        try:
-            words = jieba.lcut(item[2], cut_all=False)
-            docs.append(words)
-        except IndexError as e:
-            print('\n', e)
-            pass
-
-    return docs, label
-
-
 def loadTestDataSet():
     docs = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
             ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
