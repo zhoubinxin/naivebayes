@@ -1,4 +1,5 @@
 import re
+from collections import Counter,defaultdict
 from itertools import islice
 
 import jieba
@@ -117,19 +118,22 @@ class TFIDF(object):
         :return: tfDicts: 包含每个文档的TF词典的列表
         """
         tfList = []
+        vocab_dict = defaultdict(int)
+        for i, word in enumerate(self.vocabList):
+            vocab_dict[word] = i
+
         for doc in tqdm(self.docs, desc='计算TF'):
-            tfDoc = [0] * len(self.vocabList)
             word_count = len(doc)
             if word_count == 0:
-                tfList.append(tfDoc)
+                tfList.append([0] * len(self.vocabList))
                 continue
-            for word in doc:
-                if word in self.vocabList:
-                    index = self.vocabList.index(word)
-                    tfDoc[index] += 1
-            # 将每个词的频数除以文档中的总词数，得到词频
-            tfDoc = [count / word_count for count in tfDoc]
-            tfList.append(tfDoc)
+            tfDoc = [0] * len(self.vocabList)
+            word_freq = Counter(doc)
+            for word, freq in word_freq.items():
+                index = vocab_dict[word]
+                tfDoc[index] = freq
+            tfDoc = np.array(tfDoc) / word_count
+            tfList.append(tfDoc.tolist())
         return tfList
 
     def calc_idf(self):
@@ -140,15 +144,15 @@ class TFIDF(object):
         numDocs = len(self.docs)
         idfList = [0] * len(self.vocabList)
 
-        for doc in tqdm(self.docs, desc='计算IDF'):
-            unique_words = set(doc)
-            for word in unique_words:
-                if word in self.vocabList:
-                    index = self.vocabList.index(word)
-                    idfList[index] += 1
+        word_doc_count = Counter()
+        for doc in self.docs:
+            word_doc_count.update(set(doc))
 
-        # 计算每个单词的IDF值
-        idfList = [np.log(numDocs / (1 + count)) for count in idfList]
+        for word, count in tqdm(word_doc_count.items(), desc='计算IDF'):
+            if word in self.vocabList:
+                index = self.vocabList.index(word)
+                idfList[index] = np.log(numDocs / (1 + count))
+
         return idfList
 
     def calc_tfidf(self):
@@ -160,8 +164,10 @@ class TFIDF(object):
         idfList = self.calc_idf()
         tfidfList = []
 
+        idfArray = np.array(idfList)
         for tfDoc in tqdm(tfList, desc='计算TF-IDF'):
-            tfidfDoc = [tf * idf for tf, idf in zip(tfDoc, idfList)]
+            tfArray = np.array(tfDoc)
+            tfidfDoc = tfArray * idfArray
             tfidfDoc = self.mm(tfidfDoc)
             tfidfList.append(tfidfDoc)
 
@@ -191,6 +197,7 @@ class TFIDF(object):
 def trainNB0(trainMatrix, trainCategory, alpha=0.1):
     """
     朴素贝叶斯分类器训练函数
+    :param alpha:
     :param trainMatrix: 由文本向量组成的矩阵
     :param trainCategory: 训练样本对应的标签
     :return: p0Vec: 非垃圾词汇的概率
