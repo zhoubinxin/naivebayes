@@ -1,15 +1,6 @@
 import jieba
 from itertools import islice
-import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import accuracy_score
-from tqdm import tqdm
 from tqdm.contrib.itertools import product
-from naiveBayes import trainNB0, classifyNB
-import re
-from collections import Counter
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.base import clone
 import numpy as np
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
@@ -59,8 +50,7 @@ class SimpleCountVectorizer:
     def fit(self, raw_documents):
         vocab = {}
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
-            for word in words:
+            for word in doc:  # 预处理后的文档已经分词为列表
                 if word not in vocab:
                     vocab[word] = len(vocab)
         self.vocabulary_ = vocab
@@ -70,9 +60,8 @@ class SimpleCountVectorizer:
     def transform(self, raw_documents):
         rows = []
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
             row = [0] * len(self.vocabulary_)
-            for word in words:
+            for word in doc:
                 if word in self.vocabulary_:
                     row[self.vocabulary_[word]] += 1
             rows.append(row)
@@ -81,6 +70,7 @@ class SimpleCountVectorizer:
     def fit_transform(self, raw_documents):
         self.fit(raw_documents)
         return self.transform(raw_documents)
+
 
 class SimpleTfidfVectorizer:
     def __init__(self):
@@ -93,7 +83,7 @@ class SimpleTfidfVectorizer:
         total_docs = len(raw_documents)
 
         for doc in raw_documents:
-            words = set(jieba.lcut(doc))  # 使用 jieba 分词
+            words = set(doc)  # 预处理后的文档已经分词为列表
             for word in words:
                 if word not in vocab:
                     vocab[word] = len(vocab)
@@ -111,10 +101,9 @@ class SimpleTfidfVectorizer:
     def transform(self, raw_documents):
         rows = []
         for doc in raw_documents:
-            words = jieba.lcut(doc)  # 使用 jieba 分词
             row = [0] * len(self.vocabulary_)
             word_count = {}
-            for word in words:
+            for word in doc:
                 if word in self.vocabulary_:
                     word_count[word] = word_count.get(word, 0) + 1
 
@@ -129,13 +118,6 @@ class SimpleTfidfVectorizer:
         self.fit(raw_documents)
         return self.transform(raw_documents)
 
-
-import numpy as np
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-from joblib import Parallel, delayed
-import itertools
-import os
 
 class SimpleGridSearchCV:
     def __init__(self, estimator, param_grid, cv=5, n_jobs=-1):
@@ -274,13 +256,15 @@ class SimpleHalvingGridSearchCV:
                 f.write(f"Params: {result['params']}, Score: {result['score']}\n")
 
 
-def loadCNDataSet(lines):
+def loadCNDataSet(lines, stop_words):
     """
-    读取中文数据集
-    :return:
+    读取中文数据集并进行分词和停用词过滤
+    :param lines: 数据集的行数
+    :param stop_words: 停用词集合
+    :return: 分词并过滤停用词后的文本和标签
     """
     docs = []  # 存储文本
-    label = []  # 存储标签
+    labels = []  # 存储标签
 
     try:
         with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
@@ -292,25 +276,18 @@ def loadCNDataSet(lines):
 
     for item in tqdm(dataSet, desc='加载数据集：'):
         # 0：非垃圾短信；1：垃圾短信
-        label.append(int(item[1]))
+        labels.append(int(item[1]))
 
-        # 将每条短信拆分为单词列表
+        # 将每条短信拆分为单词列表，并过滤停用词
         try:
             words = jieba.lcut(item[2], cut_all=False)
-            docs.append(words)
+            filtered_words = [word for word in words if word not in stop_words]
+            docs.append(filtered_words)
         except IndexError as e:
             print('\n', e)
             pass
 
-    return docs, label
-
-
-def preprocess_doc(args):
-    """
-    单个文档预处理函数，用于多进程调用
-    """
-    doc, stop_words = args
-    return ' '.join(jieba.lcut(doc, cut_all=False) if isinstance(doc, str) else doc)  # 预处理文档并返回处理后的文本字符串
+    return docs, labels
 
 
 if __name__ == '__main__':
