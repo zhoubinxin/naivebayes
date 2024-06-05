@@ -1,7 +1,12 @@
 import jieba
 from itertools import islice
-
 from tqdm.contrib.itertools import product
+import numpy as np
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+from joblib import Parallel, delayed
+import itertools
+import os
 
 
 # 简单朴素贝叶斯分类器
@@ -116,14 +121,6 @@ class SimpleTfidfVectorizer:
     def fit_transform(self, raw_documents):
         self.fit(raw_documents)
         return self.transform(raw_documents)
-
-
-import numpy as np
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-from joblib import Parallel, delayed
-import itertools
-import os
 
 
 class SimpleGridSearchCV:
