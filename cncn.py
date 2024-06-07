@@ -1,12 +1,7 @@
 import jieba
 from itertools import islice
+
 from tqdm.contrib.itertools import product
-import numpy as np
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-from joblib import Parallel, delayed
-import itertools
-import os
 
 
 # 简单朴素贝叶斯分类器
@@ -95,9 +90,10 @@ class SimpleCountVectorizer:
 
 
 class SimpleTfidfVectorizer:
-    def __init__(self):
+    def __init__(self, use_idf=True):
         self.vocabulary_ = {}
         self.idf_ = {}
+        self.use_idf = use_idf
 
     def fit(self, raw_documents):
         vocab = {}
@@ -105,7 +101,7 @@ class SimpleTfidfVectorizer:
         total_docs = len(raw_documents)
 
         for doc in raw_documents:
-            words = doc  # 使用 jieba 分词
+            words = doc # 使用 jieba 分词
             for word in words:
                 if word not in vocab:
                     vocab[word] = len(vocab)
@@ -115,8 +111,9 @@ class SimpleTfidfVectorizer:
 
         self.vocabulary_ = vocab
 
-        for word, count in doc_count.items():
-            self.idf_[word] = np.log(total_docs / (1 + count))
+        if self.use_idf:
+            for word, count in doc_count.items():
+                self.idf_[word] = np.log(total_docs / (1 + count))
 
         return self
 
@@ -131,8 +128,10 @@ class SimpleTfidfVectorizer:
                     word_count[word] = word_count.get(word, 0) + 1
 
             for word, count in word_count.items():
-                if word in self.idf_:
+                if self.use_idf and word in self.idf_:
                     row[self.vocabulary_[word]] = count * self.idf_[word]
+                else:
+                    row[self.vocabulary_[word]] = count
 
             rows.append(row)
         return np.array(rows)
@@ -140,6 +139,22 @@ class SimpleTfidfVectorizer:
     def fit_transform(self, raw_documents):
         self.fit(raw_documents)
         return self.transform(raw_documents)
+
+    def get_params(self, deep=True):
+        return {"use_idf": self.use_idf}
+
+    def set_params(self, **params):
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
+
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+from joblib import Parallel, delayed
+import itertools
+import os
 
 
 class SimpleGridSearchCV:
@@ -174,7 +189,6 @@ class SimpleGridSearchCV:
     def _evaluate_params(self, params, X, y):
         scores = []
         for fold in range(self.cv):
-
             X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=1 / self.cv, random_state=fold)
             model = self.estimator.set_params(**params)
             model.fit(X_train, y_train)
