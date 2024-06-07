@@ -16,7 +16,7 @@ def main():
     vocabList = nb.createVocabList(docs)
 
     # 构建词向量矩阵
-    trainMat = []
+    # trainMat = []
     # for inputSet in tqdm(docs, desc='构建词向量矩阵'):
     # trainMat.append(nb.setOfWords2Vec(vocabList, inputSet))
     # trainMat.append(nb.bagOfWords2VecMN(vocabList, inputSet))
@@ -28,9 +28,8 @@ def main():
     # random_state 表示随机数的种子，保证每次划分的数据集都是相同的
     X_train, X_test, y_train, y_test = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
-    # 网格搜索
     min_alpha = 2.1
-    max_alpha = 2.2
+    max_alpha = 3
     best_f1 = 0
     best_alpha = None
     best_metrics = None

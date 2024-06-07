@@ -1,13 +1,281 @@
 import re
-from collections import Counter,defaultdict
-from itertools import islice
-
-import jieba
+from collections import Counter, defaultdict
 import nltk
 import numpy as np
+from joblib import Parallel, delayed
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from nltk.corpus import stopwords
+
+
+class NaiveBayes(object):
+    def __init__(self, alpha=1.0):
+        """
+        初始化朴素贝叶斯分类器
+        """
+        self.alpha = alpha
+        self.classes = None
+        self.classLogPrior = None
+        self.featureLogProb = None
+        self.pAbusive = None
+
+    def fit(self, trainMat, label):
+        """
+        朴素贝叶斯分类器训练函数
+        :param trainMat: 由文本向量组成的矩阵
+        :param label: 训练样本对应的标签
+        :return: p0Vec: 非垃圾词汇的概率
+                 p1Vec: 垃圾词汇的概率
+                 pAbusive: 垃圾短信的概率
+        """
+        trainMat = np.array(trainMat)
+        numTrainDocs, numWords = trainMat.shape  # 文档个数,单词个数
+        self.classes = np.unique(label)  # 类别标签
+        numClasses = len(self.classes)  # 类别个数
+
+        self.pAbusive = sum(label) / float(numTrainDocs)  # 计算垃圾短信的概率
+
+        self.classLogPrior = np.zeros(numClasses)  # 初始化先验概率
+        self.featureLogProb = np.zeros((numClasses, numWords))  # 初始化条件概率
+
+        for idx, c in enumerate(self.classes):
+            X_c = trainMat[label == c]  # 获取类别为c的样本
+            self.classLogPrior[idx] = np.log(len(X_c) / float(numTrainDocs))  # 计算先验概率
+            self.featureLogProb[idx] = np.log(
+                (X_c.sum(axis=0) + self.alpha) / (X_c.sum() + self.alpha * numWords))  # 计算条件概率
+
+    def evaluateModel(self, X_test_vec, y_test):
+        """
+        评估模型
+        :param X_test_vec: 测试样本
+        :param y_test: 测试样本对应的标签
+        :return:
+        """
+        y_pred = self.predict(X_test_vec)
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, average='weighted', zero_division=1)
+        recall = recall_score(y_test, y_pred, average='weighted')
+        f1 = f1_score(y_test, y_pred, average='weighted')
+        conf_matrix = confusion_matrix(y_test, y_pred)
+        return accuracy, precision, recall, f1, conf_matrix
+
+    def score(self, X, y):
+        return np.mean(self.predict(X) == y)
+
+    def predict(self, vec2Classify):
+        """
+        朴素贝叶斯分类函数
+        :param vec2Classify: 待分类的文本向量
+        :return: 分类结果
+        """
+        jll = vec2Classify @ self.featureLogProb.T + self.classLogPrior
+        return self.classes[np.argmax(jll, axis=1)]
+
+    def setAlpha(self, alpha):
+        self.alpha = alpha
+        return self
+
+
+class WordToVec(object):
+    def __init__(self):
+        self.vocabList = []
+        self.idfList = []
+
+    def fit(self, docs):
+        """
+        创建词汇表
+        :param docs:
+        :return:
+        """
+        self.vocabList = list(set([word for doc in docs for word in doc]))
+
+    def fit_tfidf(self, docs):
+        self.fit(docs)
+        self.calc_idf(docs)
+
+    def calc_tf(self, docs):
+        """
+        计算词频 TF
+        :return: tfDicts: 包含每个文档的TF词典的列表
+        """
+        tfList = []
+        vocab_dict = defaultdict(int)
+        for i, word in enumerate(self.vocabList):
+            vocab_dict[word] = i
+
+        for doc in tqdm(docs, desc='计算TF'):
+            word_count = len(doc)
+            if word_count == 0:
+                tfList.append([0] * len(self.vocabList))
+                continue
+            tfDoc = [0] * len(self.vocabList)
+            word_freq = Counter(doc)
+            for word, freq in word_freq.items():
+                index = vocab_dict[word]
+                tfDoc[index] = freq
+            tfDoc = np.array(tfDoc) / word_count
+            tfList.append(tfDoc.tolist())
+        return tfList
+
+    def calc_idf(self, docs):
+        """
+        计算逆文档频率 IDF
+        :return: idfDict: 包含每个单词的IDF值的词典
+        """
+        numDocs = len(docs)
+        idfList = [0] * len(self.vocabList)
+
+        word_doc_count = Counter()
+        for doc in docs:
+            word_doc_count.update(set(doc))
+
+        for word, count in tqdm(word_doc_count.items(), desc='计算IDF'):
+            if word in self.vocabList:
+                index = self.vocabList.index(word)
+                idfList[index] = np.log(numDocs / (1 + count))
+
+        return idfList
+
+    def setWordToVec(self, docs):
+        returnVec = []
+        # 遍历文档中的所有单词
+        for doc in docs:
+            vec = [0] * len(self.vocabList)
+            for word in doc:
+                if word in self.vocabList:
+                    vec[self.vocabList.index(word)] = 1
+            returnVec.append(vec)
+        return returnVec
+
+    def bagWordToVec(self, docs):
+        returnVec = []
+        for doc in docs:
+            vec = [0] * len(self.vocabList)
+            for word in doc:
+                if word in self.vocabList:
+                    vec[self.vocabList.index(word)] += 1
+            returnVec.append(vec)
+        return returnVec
+
+    def tfidfWordToVec(self, docs):
+        """
+        TF-IDF算法实现
+        :return: returnVec: 文档向量
+        """
+        tfidfVec = []
+        tfList = self.calc_tf(docs)
+        idfArray = np.array(self.idfList)
+        for tfDoc in tqdm(tfList, desc='计算TF-IDF'):
+            tfArray = np.array(tfDoc)
+            tfidfDoc = tfArray * idfArray
+            tfidfDoc = self.mm(tfidfDoc)
+            tfidfVec.append(tfidfDoc)
+
+        return tfidfVec
+
+    def mm(self, vec):
+        """
+        归一化向量 使得某一个特征对最终结果不会造成更大的影响
+        :param vec: 向量
+        :return: 归一化后的向量
+        """
+        minVal = min(vec)
+        maxVal = max(vec)
+
+        if maxVal == minVal:  # 避免除以0的情况
+            return vec
+
+        mx = 1
+        mi = 0
+        data = []
+        for x in vec:
+            X = (x - minVal) / (maxVal - minVal)
+            data.append(X * (mx - mi) + mi)
+        return data
+
+
+class TfidfVectorizer:
+    def __init__(self):
+        self.vocabulary = {}
+        self.idf = {}
+
+    def fit(self, raw_documents):
+        vocab = {}
+        doc_count = {}
+        total_docs = len(raw_documents)
+
+        for doc in raw_documents:
+            words = set(doc)
+            for word in words:
+                if word not in vocab:
+                    vocab[word] = len(vocab)
+                    doc_count[word] = 1
+                else:
+                    doc_count[word] += 1
+
+        self.vocabulary = vocab
+
+        for word, count in doc_count.items():
+            self.idf[word] = np.log(total_docs / (1 + count))
+
+        return self
+
+    def transform(self, raw_documents):
+        rows = []
+        for doc in raw_documents:
+            words = doc
+            row = [0] * len(self.vocabulary)
+            word_count = {}
+            for word in words:
+                if word in self.vocabulary:
+                    word_count[word] = word_count.get(word, 0) + 1
+
+            for word, count in word_count.items():
+                if word in self.idf:
+                    row[self.vocabulary[word]] = count * self.idf[word]
+
+            rows.append(row)
+        return np.array(rows)
+
+    def fit_transform(self, raw_documents):
+        self.fit(raw_documents)
+        return self.transform(raw_documents)
+
+
+class ParamSearchCV(object):
+    def __init__(self, estimator, alphaList, cv=5, n_jobs=-1):
+        self.estimator = estimator
+        self.alphaList = alphaList
+        self.cv = cv
+        self.n_jobs = n_jobs
+        self.best_params = None
+        self.best_score = None
+        self.cv_results = []
+
+    def fit(self, X, y):
+        self.best_score = -np.inf
+        self.best_params = None
+
+        results = Parallel(n_jobs=self.n_jobs)(
+            delayed(self.evaluate_params)(alpha, X, y) for alpha in tqdm(self.alphaList, desc="参数搜索")
+        )
+
+        for alpha, avg_score in results:
+            self.cv_results.append({'alpha': alpha, 'score': avg_score})
+            if avg_score > self.best_score:
+                self.best_score = avg_score
+                self.best_params = alpha
+
+    def evaluate_params(self, alpha, X, y):
+        scores = []
+        for fold in range(self.cv):
+            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=1 / self.cv, random_state=fold)
+            model = self.estimator.setAlpha(alpha)
+            model.fit(X_train, y_train)
+            scores.append(model.score(X_val, y_val))
+        avg_score = np.mean(scores)
+        return alpha, avg_score
 
 
 def loadDataSet():
@@ -26,7 +294,7 @@ def loadDataSet():
         with open('naivebayes/data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
             dataSet = [line.strip().split('\t') for line in file.readlines()]
 
-    nltk.download('stopwords')
+    # nltk.download('stopwords')
     stop_words = set(stopwords.words('english'))
     for item in tqdm(dataSet, desc='加载数据'):
         # ham -> 0：表示非垃圾短信
@@ -47,6 +315,7 @@ def loadDataSet():
         docs.append(words)
 
     return docs, label
+
 
 def loadTestDataSet():
     docs = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
@@ -209,8 +478,8 @@ def trainNB0(trainMatrix, trainCategory, alpha=0.1):
     pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾短信的概率
     # 初始化概率
     # 拉普拉斯平滑
-    p0Num = np.ones(numWords)
-    p1Num = np.ones(numWords)
+    p0Num = np.zeros(numWords) + 1
+    p1Num = np.zeros(numWords)
     p0Denom = numWords * alpha
     p1Denom = numWords * alpha
 
@@ -231,7 +500,7 @@ def trainNB0(trainMatrix, trainCategory, alpha=0.1):
 
 def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
     """
-    朴素贝叶斯分类函数
+    预测
     :param vec2Classify: 待分类的文本向量
     :param p0Vec: 非垃圾词汇的概率
     :param p1Vec: 垃圾词汇的概率
@@ -259,9 +528,9 @@ def evaluate_model(p0V, p1V, pAb, X_test_vec, y_test):
     """
     y_pred = [classifyNB(vec, p0V, p1V, pAb) for vec in X_test_vec]
     accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='weighted', zero_division=1)
+    recall = recall_score(y_test, y_pred, average='weighted')
+    f1 = f1_score(y_test, y_pred, average='weighted')
     conf_matrix = confusion_matrix(y_test, y_pred)
     return accuracy, precision, recall, f1, conf_matrix
 
