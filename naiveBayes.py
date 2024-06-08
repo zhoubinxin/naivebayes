@@ -1,10 +1,9 @@
 import re
 from collections import Counter, defaultdict
-import nltk
 import numpy as np
 from joblib import Parallel, delayed
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 from nltk.corpus import stopwords
 
@@ -72,6 +71,16 @@ class NaiveBayes(object):
         jll = vec2Classify @ self.featureLogProb.T + self.classLogPrior
         return self.classes[np.argmax(jll, axis=1)]
 
+    def predict_proba(self, vec2Classify):
+        """
+        返回每个样本属于每个类的概率
+        :param vec2Classify: 待分类的文本向量
+        :return: 每个样本属于每个类的概率
+        """
+        jll = vec2Classify @ self.featureLogProb.T + self.classLogPrior
+        log_prob_x = np.log(np.sum(np.exp(jll), axis=1))
+        return np.exp(jll - log_prob_x[:, np.newaxis])
+
     def setAlpha(self, alpha):
         self.alpha = alpha
         return self
@@ -80,7 +89,7 @@ class NaiveBayes(object):
 class WordToVec(object):
     def __init__(self):
         self.vocabList = []
-        self.idfList = []
+        self.idf = []
 
     def fit(self, docs):
         """
@@ -91,37 +100,35 @@ class WordToVec(object):
         self.vocabList = list(set([word for doc in docs for word in doc]))
 
     def fit_tfidf(self, docs):
-        self.fit(docs)
-        self.calc_idf(docs)
+        vocab_dict = {}
+        doc_count = {}
+        total_docs = len(docs)
 
-    def calc_tf(self, docs):
-        """
-        计算词频 TF
-        :return: tfDicts: 包含每个文档的TF词典的列表
-        """
-        tfList = []
-        vocab_dict = defaultdict(int)
-        for i, word in enumerate(self.vocabList):
-            vocab_dict[word] = i
+        for doc in docs:
+            words = set(doc)
+            for word in words:
+                if word not in vocab_dict:
+                    vocab_dict[word] = len(vocab_dict)
+                    doc_count[word] = 1
+                else:
+                    doc_count[word] += 1
 
-        for doc in tqdm(docs, desc='计算TF'):
-            word_count = len(doc)
-            if word_count == 0:
-                tfList.append([0] * len(self.vocabList))
-                continue
-            tfDoc = [0] * len(self.vocabList)
-            word_freq = Counter(doc)
-            for word, freq in word_freq.items():
-                index = vocab_dict[word]
-                tfDoc[index] = freq
-            tfDoc = np.array(tfDoc) / word_count
-            tfList.append(tfDoc.tolist())
-        return tfList
+        self.vocabList = [None] * len(vocab_dict)
+        for word, index in vocab_dict.items():
+            self.vocabList[index] = word
+
+        self.idf = [0] * len(vocab_dict)
+        for word, count in doc_count.items():
+            index = vocab_dict[word]
+            self.idf[index] = np.log(total_docs / (1 + count))
+
+        return self
 
     def calc_idf(self, docs):
         """
         计算逆文档频率 IDF
-        :return: idfDict: 包含每个单词的IDF值的词典
+        :param docs: List[List[str]] - 文档集合
+        :return: List[float] - 包含每个单词的IDF值的列表
         """
         numDocs = len(docs)
         idfList = [0] * len(self.vocabList)
@@ -161,24 +168,32 @@ class WordToVec(object):
     def tfidfWordToVec(self, docs):
         """
         TF-IDF算法实现
-        :return: returnVec: 文档向量
+        :param docs: List[List[str]] - 文档集合
+        :return: List[List[float]] - 文档向量
         """
-        tfidfVec = []
-        tfList = self.calc_tf(docs)
-        idfArray = np.array(self.idfList)
-        for tfDoc in tqdm(tfList, desc='计算TF-IDF'):
-            tfArray = np.array(tfDoc)
-            tfidfDoc = tfArray * idfArray
-            tfidfDoc = self.mm(tfidfDoc)
-            tfidfVec.append(tfidfDoc)
+        rows = []
+        for doc in docs:
+            words = doc
+            row = [0] * len(self.vocabList)
+            word_count = {}
+            for word in words:
+                if word in self.vocabList:
+                    word_count[word] = word_count.get(word, 0) + 1
 
-        return tfidfVec
+            for word, count in word_count.items():
+                if word in self.vocabList:
+                    index = self.vocabList.index(word)
+                    row[index] = count * self.idf[index]
+
+            # row = self.mm(row)
+            rows.append(row)
+        return rows
 
     def mm(self, vec):
         """
         归一化向量 使得某一个特征对最终结果不会造成更大的影响
-        :param vec: 向量
-        :return: 归一化后的向量
+        :param vec: List[float] - 向量
+        :return: List[float] - 归一化后的向量
         """
         minVal = min(vec)
         maxVal = max(vec)
@@ -186,61 +201,7 @@ class WordToVec(object):
         if maxVal == minVal:  # 避免除以0的情况
             return vec
 
-        mx = 1
-        mi = 0
-        data = []
-        for x in vec:
-            X = (x - minVal) / (maxVal - minVal)
-            data.append(X * (mx - mi) + mi)
-        return data
-
-
-class TfidfVectorizer:
-    def __init__(self):
-        self.vocabulary = {}
-        self.idf = {}
-
-    def fit(self, raw_documents):
-        vocab = {}
-        doc_count = {}
-        total_docs = len(raw_documents)
-
-        for doc in raw_documents:
-            words = set(doc)
-            for word in words:
-                if word not in vocab:
-                    vocab[word] = len(vocab)
-                    doc_count[word] = 1
-                else:
-                    doc_count[word] += 1
-
-        self.vocabulary = vocab
-
-        for word, count in doc_count.items():
-            self.idf[word] = np.log(total_docs / (1 + count))
-
-        return self
-
-    def transform(self, raw_documents):
-        rows = []
-        for doc in raw_documents:
-            words = doc
-            row = [0] * len(self.vocabulary)
-            word_count = {}
-            for word in words:
-                if word in self.vocabulary:
-                    word_count[word] = word_count.get(word, 0) + 1
-
-            for word, count in word_count.items():
-                if word in self.idf:
-                    row[self.vocabulary[word]] = count * self.idf[word]
-
-            rows.append(row)
-        return np.array(rows)
-
-    def fit_transform(self, raw_documents):
-        self.fit(raw_documents)
-        return self.transform(raw_documents)
+        return [(x - minVal) / (maxVal - minVal) for x in vec]
 
 
 class ParamSearchCV(object):
@@ -268,9 +229,14 @@ class ParamSearchCV(object):
                 self.best_params = alpha
 
     def evaluate_params(self, alpha, X, y):
+        X = np.array(X)
+        y = np.array(y)
+
         scores = []
-        for fold in range(self.cv):
-            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=1 / self.cv, random_state=fold)
+        skf = StratifiedKFold(n_splits=self.cv, shuffle=True, random_state=42)
+        for train_index, val_index in skf.split(X, y):
+            X_train, X_val = X[train_index], X[val_index]
+            y_train, y_val = y[train_index], y[val_index]
             model = self.estimator.setAlpha(alpha)
             model.fit(X_train, y_train)
             scores.append(model.score(X_val, y_val))
@@ -355,7 +321,6 @@ def setOfWords2Vec(vocabList, inputSet):
     # 遍历文档中的所有单词
     for word in inputSet:
         if word in vocabList:
-            # 如果词表中的单词在输入文档中出现，则将returnVec中对应位置的值设为1
             returnVec[vocabList.index(word)] = 1
     return returnVec
 
@@ -478,8 +443,8 @@ def trainNB0(trainMatrix, trainCategory, alpha=0.1):
     pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾短信的概率
     # 初始化概率
     # 拉普拉斯平滑
-    p0Num = np.zeros(numWords) + 1
-    p1Num = np.zeros(numWords)
+    p0Num = np.ones(numWords) + alpha
+    p1Num = np.ones(numWords) + alpha
     p0Denom = numWords * alpha
     p1Denom = numWords * alpha
 

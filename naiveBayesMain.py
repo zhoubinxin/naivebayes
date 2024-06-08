@@ -17,7 +17,8 @@ def main():
     # 训练朴素贝叶斯分类器
     trainMat = []
     for postinDoc in tqdm(listOposts):
-        trainMat.append(setOfWords2Vec(myVocabList, postinDoc))
+        # trainMat.append(setOfWords2Vec(myVocabList, postinDoc))
+        trainMat.append(bagOfWords2VecMN(myVocabList, postinDoc))
 
     X_train, X_test, y_train, y_test = train_test_split(trainMat, listClasses, test_size=0.2, random_state=1)
     # 训练数据
@@ -31,11 +32,11 @@ def main():
     f1 = f1_score(y_test, y_pred)
     conf_matrix = confusion_matrix(y_test, y_pred)
 
-    print(f"Accuracy: {accuracy}")
-    print(f"Precision: {precision}")
-    print(f"Recall: {recall}")
-    print(f"F1 Score: {f1}")
-    print(f"Confusion Matrix: \n{conf_matrix}")
+    print(f"准确率: {accuracy}")
+    print(f"精确率: {precision}")
+    print(f"召回率: {recall}")
+    print(f"F1 值: {f1}")
+    print(f"混淆矩阵\n{conf_matrix}")
 
 
 if __name__ == '__main__':
