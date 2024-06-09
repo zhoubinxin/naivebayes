@@ -1,3 +1,4 @@
+import random
 import re
 from collections import Counter, defaultdict
 import numpy as np
@@ -244,7 +245,7 @@ class ParamSearchCV(object):
         return alpha, avg_score
 
 
-def loadDataSet():
+def loadDataSet(target_spam_count=None):
     """
     读取数据
     :return: postingList: 词条切分后的文档集合
@@ -280,7 +281,50 @@ def loadDataSet():
         words = [word for word in words if word not in stop_words]
         docs.append(words)
 
+    if target_spam_count:
+        # 下采样
+        docs, label = downsample(docs, label, target_spam_count)
+
     return docs, label
+
+
+def downsample(docs, labels, target_spam_count):
+    """
+    下采样以平衡数据集
+    :param docs: 文档集合
+    :param labels: 类别标签
+    :param target_spam_count: 目标垃圾短信数量
+    :return: 下采样后的文档集合和类别标签
+    """
+    ham_docs = [doc for doc, label in zip(docs, labels) if label == 0]
+    spam_docs = [doc for doc, label in zip(docs, labels) if label == 1]
+
+    # 获取垃圾短信和非垃圾短信的实际数量
+    spam_count = len(spam_docs)
+    ham_count = len(ham_docs)
+
+    # 如果目标垃圾短信数量超过实际数量，抛出异常
+    if target_spam_count > spam_count:
+        raise ValueError(f"目标垃圾短信数量 {target_spam_count} 超过实际垃圾短信数量 {spam_count}")
+
+    # 对垃圾短信进行下采样
+    spam_docs = random.sample(spam_docs, target_spam_count)
+    spam_labels = [1] * target_spam_count
+
+    # 对非垃圾短信进行下采样，使数量与目标垃圾短信数量相同
+    ham_docs = random.sample(ham_docs, target_spam_count)
+    ham_labels = [0] * target_spam_count
+
+    # 合并下采样后的数据
+    docs_downsampled = ham_docs + spam_docs
+    labels_downsampled = ham_labels + spam_labels
+
+    # 打乱数据顺序
+    combined = list(zip(docs_downsampled, labels_downsampled))
+    random.shuffle(combined)
+    docs_downsampled, labels_downsampled = zip(*combined)
+
+    return list(docs_downsampled), list(labels_downsampled)
 
 
 def loadTestDataSet():

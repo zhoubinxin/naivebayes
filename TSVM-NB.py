@@ -1,8 +1,12 @@
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import SVC
+
 from naiveBayes import *
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.model_selection import train_test_split
+import naiveBayesv1 as v1
 
 
 class LinearSVM:
@@ -43,7 +47,7 @@ def tsvm_nb_algorithm(X, y):
     n_samples = len(X)
     distance_matrix = np.full((n_samples, n_samples), np.inf)
 
-    for i in tqdm(range(n_samples),desc='计算距离矩阵'):
+    for i in tqdm(range(n_samples), desc='计算距离矩阵'):
         for j in range(n_samples):
             if i != j:
                 distance_matrix[i, j] = euclidean_distance(X[i], X[j])
@@ -52,7 +56,7 @@ def tsvm_nb_algorithm(X, y):
     nearest_neighbors = np.zeros(n_samples, dtype=int)
     min_distances = np.full(n_samples, np.inf)
 
-    for i in tqdm(range(n_samples),desc='选择最近邻'):
+    for i in tqdm(range(n_samples), desc='选择最近邻'):
         for j in range(n_samples):
             if distance_matrix[i, j] < min_distances[i]:
                 min_distances[i] = distance_matrix[i, j]
@@ -61,7 +65,7 @@ def tsvm_nb_algorithm(X, y):
     # 初始化标志矩阵
     flags = np.ones(n_samples)
 
-    for i in tqdm(range(n_samples),desc='计算标志矩阵'):
+    for i in tqdm(range(n_samples), desc='计算标志矩阵'):
         neighbor_idx = nearest_neighbors[i]
         if y[i] != y[neighbor_idx]:
             flags[i] = -1
@@ -69,7 +73,7 @@ def tsvm_nb_algorithm(X, y):
             flags[i] = 1
 
     # 修剪样本集
-    for i in tqdm(range(n_samples),desc='修剪样本集'):
+    for i in tqdm(range(n_samples), desc='修剪样本集'):
         neighbor_idx = nearest_neighbors[i]
         if flags[i] == -1:
             # 选择删除点，优先删除距离较远的点
@@ -119,21 +123,64 @@ def main():
 
     nb = tsvm_nb_algorithm(X_optimized, y_optimized)
     y_pred = nb.predict(X_test)
-    conf_matrix = confusion_matrix(y_test, y_pred)
-    print(f"混淆矩阵: \n{conf_matrix}")
-
     y_probs = nb.predict_proba(X_test)[:, 1]  # 选择概率中的正类概率
-    fpr, tpr, thresholds = roc_curve(y_test, y_probs)
-    roc_auc = roc_auc_score(y_test, y_probs)
+
+    # ——————————————————————————————————————————————————————————————————————
+    # SVM
+    docs, label = v1.loadDataSet()
+
+    vocabList = v1.createVocabList(docs)
+
+    trainMat = []
+    for postinDoc in tqdm(docs):
+        trainMat.append(setOfWords2Vec(vocabList, postinDoc))
+
+    X_train_o, X_test_o, y_train_o, y_test_o = train_test_split(trainMat, label, test_size=0.2, random_state=1)
+
+    # 训练SVM模型
+    svm = SVC(kernel='linear',probability=True)
+    svm.fit(X_train_o, y_train_o)
+
+    svm_pred = svm.predict(X_test_o)
+    svm_probs = svm.predict_proba(X_test_o)
+
+    # ——————————————————————————————————————————————————————————————————
+    # 朴素贝叶斯
+    nbmodel = MultinomialNB()
+    nbmodel.fit(X_train_o, X_test_o)
+
+    nb_pred = nbmodel.predict(X_test_o)
+    nb_probs = nbmodel.predict_proba(X_test_o)
+
+    # ——————————绘制ROC——————————
+    # 计算每个模型的假阳性率、真阳性率和AUC
+    fpr1, tpr1, _ = roc_curve(y_test, y_probs)
+    roc_auc1 = roc_auc_score(y_test, y_probs)
+
+    fpr2, tpr2, _ = roc_curve(y_test_o, svm_probs)
+    roc_auc2 = roc_auc_score(y_test_o, svm_probs)
+
+    fpr3, tpr3, _ = roc_curve(y_test_o, nb_probs)
+    roc_auc3 = roc_auc_score(y_test_o, nb_probs)
+
+    # 绘制ROC曲线
     plt.figure()
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot(fpr1, tpr1, color='darkorange', lw=2, label='TSVM-NB (AUC = %0.2f)' % roc_auc1)
+    plt.plot(fpr2, tpr2, color='green', lw=2, label='SVM (AUC = %0.2f)' % roc_auc2)
+    plt.plot(fpr3, tpr3, color='blue', lw=2, label='NaiveBayes (AUC = %0.2f)' % roc_auc3)
+
+    # 绘制对角线
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+
+    # 设置图形的范围、标签和标题
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic (ROC) Curve')
     plt.legend(loc="lower right")
+
+    # 显示图形
     plt.show()
 
 

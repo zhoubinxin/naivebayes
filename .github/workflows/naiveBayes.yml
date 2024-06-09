@@ -22,15 +22,13 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 'Run script'
-        run: python cn.py
+        run: python tan.py
 
       - name: Move generated files to a folder
           # env:
         # GITHUB_TOKEN: ${{ secrets.GithubToken }}
         run: |
           mkdir -p data
-          mv -n *.txt result/
-          mv -n *.json result/
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git add -A
