@@ -1,16 +1,16 @@
 
 from sklearn.metrics import recall_score, precision_score, f1_score, accuracy_score
 
-from cncn import *
+from CNPlus import *
 
 # 全网格参数搜索
 def main():
 
     stop_words = load_stop_words("scu_stopwords")
 
-    lines = 10000  # 数据量
-    listOposts, listClasses = loadCNDataSet(lines, stop_words)
-
+    lines = 30000  # 数据量
+    sample_size = 30000  # 类别样本数量
+    listOposts, listClasses = loadCNDataSet(lines, stop_words, sample_size)
 
     # 划分数据集
     X_train, X_test, y_train, y_test = train_test_split(listOposts, listClasses, test_size=0.2, random_state=1)
@@ -22,10 +22,10 @@ def main():
 
     # 使用 SimpleGridSearchCV 进行超参数搜索
     param_grid = {
-        'alpha': [6.1, 5.0, 2.0, 3.0, 4.0],
-        # 'vectorizer__max_df': [0.75, 1.0],  # 针对 SimpleCountVectorizer，aplha最优：4.0
+        'alpha': [6.0, 1.0],
+        'vectorizer__max_df': [0.75, 1.0],  # 针对 SimpleCountVectorizer
         'vectorizer__min_df': [0.1, 0.05],  # 针对 SimpleCountVectorizer和SimpleTfidfVectorizer
-        # 'vectorizer__use_idf': [True, False]  # 针对 SimpleTfidfVectorizer，aplha最优：400
+        # 'vectorizer__use_idf': [True, False]  # 针对 SimpleTfidfVectorizer
     }
     grid_search = SimpleGridSearchCV(SimpleNaiveBayes(), param_grid, cv=3)
     grid_search.fit(X_train_vec, y_train)
