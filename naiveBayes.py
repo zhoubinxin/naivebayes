@@ -261,7 +261,7 @@ def loadDataSet(target_spam_count=None):
         with open('naivebayes/data/smss/SMSSpamCollection', 'r', encoding='utf-8') as file:
             dataSet = [line.strip().split('\t') for line in file.readlines()]
 
-    # nltk.download('stopwords')
+    nltk.download('stopwords')
     stop_words = set(stopwords.words('english'))
     for item in tqdm(dataSet, desc='加载数据'):
         # ham -> 0：表示非垃圾短信
