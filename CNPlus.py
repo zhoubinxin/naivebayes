@@ -1,134 +1,63 @@
 import jieba
 from itertools import islice
-from tqdm.contrib.itertools import product
+import jieba
 from tqdm import tqdm
-from joblib import Parallel, delayed
-import itertools
-import os
-from sklearn.base import BaseEstimator, ClassifierMixin
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve
-import numpy as np
-from tkinter import Tk
-
-
-class SimpleSPODE(BaseEstimator, ClassifierMixin):
-    def __init__(self, alpha=1.0):
-        self.alpha = alpha  # 拉普拉斯平滑参数
-        self.feature_probs = {}
-        self.class_probs = {}
-        self.parent = None
-
-    def fit(self, X, y):
-        self.classes, class_counts = np.unique(y, return_counts=True)
-        self.class_probs = {c: count / len(y) for c, count in zip(self.classes, class_counts)}
-
-        # 选择特定特征作为父特征（简单起见，选择第一个特征）
-        self.parent = 0
-        self.feature_probs = {c: {} for c in self.classes}
-
-        for c in self.classes:
-            X_c = X[y == c]
-            parent_vals, parent_counts = np.unique(X_c[:, self.parent], return_counts=True)
-            parent_probs = {val: (count + self.alpha) / (len(X_c) + self.alpha * len(parent_vals))
-                            for val, count in zip(parent_vals, parent_counts)}
-            self.feature_probs[c][self.parent] = parent_probs
-
-            for feature in range(X.shape[1]):
-                if feature == self.parent:
-                    continue
-                self.feature_probs[c][feature] = {}
-                for parent_val in parent_vals:
-                    X_parent = X_c[X_c[:, self.parent] == parent_val]
-                    feature_vals, feature_counts = np.unique(X_parent[:, feature], return_counts=True)
-                    self.feature_probs[c][feature][parent_val] = {
-                        val: (count + self.alpha) / (len(X_parent) + self.alpha * len(feature_vals))
-                        for val, count in zip(feature_vals, feature_counts)}
-
-    def predict(self, X):
-        predictions = []
-        for x in X:
-            class_probs = {c: np.log(self.class_probs[c]) for c in self.classes}
-            parent_val = x[self.parent]
-            for c in self.classes:
-                parent_prob = self.feature_probs[c][self.parent].get(parent_val, self.alpha / (
-                            sum(self.feature_probs[c][self.parent].values()) + self.alpha))
-                for feature in range(X.shape[1]):
-                    if feature == self.parent:
-                        continue
-                    feature_val = x[feature]
-                    feature_prob = self.feature_probs[c][feature].get(parent_val, {}).get(feature_val, self.alpha / (
-                                sum(self.feature_probs[c][feature].get(parent_val, {}).values()) + self.alpha))
-                    class_probs[c] += np.log(parent_prob * feature_prob)
-            predictions.append(max(class_probs, key=class_probs.get))
-        return predictions
-
-    def set_params(self, **params):
-        for key, value in params.items():
-            setattr(self, key, value)
-        return self
+from itertools import islice
+import random
+from collections import Counter
+from tqdm.contrib.itertools import product
 
 
 # 简单朴素贝叶斯分类器
+import numpy as np
+
+
 class SimpleNaiveBayes:
     def __init__(self, alpha=1.0):
         self.alpha = alpha
 
-    def fit(self, X, y):
-        n_samples, n_features = X.shape
-        self.classes_ = np.unique(y)
-        n_classes = len(self.classes_)
-
-        self.class_log_prior_ = np.zeros(n_classes)
-        self.feature_log_prob_ = np.zeros((n_classes, n_features))
-
-        for idx, c in enumerate(self.classes_):
-            X_c = X[y == c]
-            self.class_log_prior_[idx] = np.log(X_c.shape[0] / n_samples)
-            self.feature_log_prob_[idx] = np.log((X_c.sum(axis=0) + self.alpha) / (X_c.sum() + self.alpha * n_features))
-
-    def predict(self, X):
-        jll = X @ self.feature_log_prob_.T + self.class_log_prior_
-        return self.classes_[np.argmax(jll, axis=1)]
-
-    def predict_proba(self, X):
-        jll = X @ self.feature_log_prob_.T + self.class_log_prior_
-        log_prob_x = np.log(np.sum(np.exp(jll), axis=1))
-        return np.exp(jll - log_prob_x[:, np.newaxis])
-
-    def score(self, X, y):
-        return np.mean(self.predict(X) == y)
-
-    def get_params(self, deep=True):
-        return {"alpha": self.alpha}
-
     def set_params(self, **params):
         for key, value in params.items():
             setattr(self, key, value)
         return self
 
-# def plot_ks_curve(y_true, y_pred_prob):
-#
-#     fpr, tpr, thresholds = roc_curve(y_true, y_pred_prob)
-#     ks_statistic = max(tpr - fpr)
-#     ks_threshold = thresholds[np.argmax(tpr - fpr)]
-#
-#     plt.figure()
-#     plt.plot(thresholds, tpr, label='真阳性率')
-#     plt.plot(thresholds, fpr, label='假阳性率')
-#     plt.axvline(ks_threshold, color='red', linestyle='--', label=f'KS阈值: {ks_threshold:.2f}')
-#     plt.axhline(ks_statistic, color='blue', linestyle='--', label=f'KS统计量: {ks_statistic:.2f}')
-#     plt.xlabel('Threshold')
-#     plt.ylabel('Rate')
-#     plt.title('KS Curve')
-#     plt.legend(loc='best')
-#
-#     # 设置窗口标题
-#     fig = plt.gcf()
-#     fig.canvas.manager.set_window_title('KS 曲线')
-#
-#     plt.show()
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        self.class_count_ = np.zeros(len(self.classes_))
+        self.feature_count_ = np.zeros((len(self.classes_), X.shape[1]))
+        self.class_log_prior_ = np.zeros(len(self.classes_))
+        self.feature_log_prob_ = np.zeros((len(self.classes_), X.shape[1]))
+
+        for idx, c in enumerate(self.classes_):
+            X_c = X[y == c]
+            self.class_count_[idx] = X_c.shape[0]
+            self.feature_count_[idx] = X_c.sum(axis=0)
+
+        self.class_log_prior_ = np.log(self.class_count_ / self.class_count_.sum())
+        smoothed_fc = self.feature_count_ + self.alpha
+        smoothed_cc = smoothed_fc.sum(axis=1).reshape(-1, 1)
+
+        # 确保 smoothed_cc 不为零
+        smoothed_cc = np.maximum(smoothed_cc, 1e-10)
+        smoothed_fc = np.maximum(smoothed_fc, 1e-10)  # 确保 smoothed_fc 也不为零
+
+        self.feature_log_prob_ = np.log(smoothed_fc / smoothed_cc)
+
+        # Check for any invalid log values
+        if np.any(np.isinf(self.feature_log_prob_)) or np.any(np.isnan(self.feature_log_prob_)):
+            raise ValueError("Invalid values encountered in log probabilities.")
+
+    def predict_log_proba(self, X):
+        return (X @ self.feature_log_prob_.T) + self.class_log_prior_
+
+    def predict(self, X):
+        return self.classes_[np.argmax(self.predict_log_proba(X), axis=1)]
+
+    def score(self, X, y):
+        from sklearn.metrics import accuracy_score
+        y_pred = self.predict(X)
+        return accuracy_score(y, y_pred)
+
 
 class SimpleCountVectorizer:
     def __init__(self, max_df=1.0, min_df=1):
@@ -182,9 +111,10 @@ class SimpleCountVectorizer:
 
 
 class SimpleTfidfVectorizer:
-    def __init__(self):
+    def __init__(self, use_idf=True):
         self.vocabulary_ = {}
         self.idf_ = {}
+        self.use_idf = use_idf
 
     def fit(self, raw_documents):
         vocab = {}
@@ -192,7 +122,7 @@ class SimpleTfidfVectorizer:
         total_docs = len(raw_documents)
 
         for doc in raw_documents:
-            words = doc  # 使用 jieba 分词
+            words = set(doc) # 使用 jieba 分词
             for word in words:
                 if word not in vocab:
                     vocab[word] = len(vocab)
@@ -202,15 +132,16 @@ class SimpleTfidfVectorizer:
 
         self.vocabulary_ = vocab
 
-        for word, count in doc_count.items():
-            self.idf_[word] = np.log(total_docs / (1 + count))
+        if self.use_idf:
+            for word, count in doc_count.items():
+                self.idf_[word] = np.log(total_docs / (1 + count))
 
         return self
 
     def transform(self, raw_documents):
         rows = []
         for doc in raw_documents:
-            words = doc  # 使用 jieba 分词
+            words = set(doc)  # 使用 jieba 分词
             row = [0] * len(self.vocabulary_)
             word_count = {}
             for word in words:
@@ -218,8 +149,10 @@ class SimpleTfidfVectorizer:
                     word_count[word] = word_count.get(word, 0) + 1
 
             for word, count in word_count.items():
-                if word in self.idf_:
+                if self.use_idf and word in self.idf_:
                     row[self.vocabulary_[word]] = count * self.idf_[word]
+                else:
+                    row[self.vocabulary_[word]] = count
 
             rows.append(row)
         return np.array(rows)
@@ -228,9 +161,25 @@ class SimpleTfidfVectorizer:
         self.fit(raw_documents)
         return self.transform(raw_documents)
 
+    def get_params(self, deep=True):
+        return {"use_idf": self.use_idf}
+
+    def set_params(self, **params):
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
+
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+from joblib import Parallel, delayed
+import itertools
+import os
+
 
 class SimpleGridSearchCV:
-    def __init__(self, estimator, param_grid, cv, n_jobs=-1):
+    def __init__(self, estimator, param_grid, cv=5, n_jobs=-1):
         self.estimator = estimator
         self.param_grid = param_grid
         self.cv = cv
@@ -261,7 +210,6 @@ class SimpleGridSearchCV:
     def _evaluate_params(self, params, X, y):
         scores = []
         for fold in range(self.cv):
-
             X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=1 / self.cv, random_state=fold)
             model = self.estimator.set_params(**params)
             model.fit(X_train, y_train)
@@ -386,23 +334,24 @@ def loadCNDataSet(lines, stop_words, sample_size=None):
             dataSet = [line.strip().split('\t') for line in islice(file, lines)]
 
     for item in tqdm(dataSet, desc='加载数据集：'):
-        # 0：非垃圾短信；1：垃圾短信
-        labels.append(int(item[1]))
+        if len(item) < 3:
+            print(f"数据格式错误：{item}")
+            continue
 
-        # 将每条短信拆分为单词列表
         try:
+            # 0：非垃圾短信；1：垃圾短信
+            labels.append(int(item[1]))
+
+            # 将每条短信拆分为单词列表
             words = jieba.lcut(item[2], cut_all=False)
-            # 去除空格
-            words = [word for word in words if word != ' ' and word not in stop_words]
+            # 去除空格和停止词，并确保元素是字符串
+            words = [word for word in words if isinstance(word, str) and word != ' ' and word not in stop_words]
             docs.append(words)
-        except IndexError as e:
-            print('\n', e)
-            pass
+        except (IndexError, ValueError) as e:
+            print(f"数据处理错误：{item}，错误信息：{e}")
+            continue
 
     if sample_size:
-        from collections import Counter
-        import random
-
         # 下采样
         counter = Counter(labels)
         min_class = min(counter, key=counter.get)
@@ -421,7 +370,6 @@ def loadCNDataSet(lines, stop_words, sample_size=None):
 
         docs = sampled_docs
         labels = sampled_labels
-
 
     return docs, labels
 
