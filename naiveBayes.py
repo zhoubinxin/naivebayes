@@ -1,6 +1,8 @@
 import random
 import re
 from collections import Counter, defaultdict
+
+import nltk
 import numpy as np
 from joblib import Parallel, delayed
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
