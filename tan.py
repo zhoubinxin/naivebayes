@@ -1,5 +1,6 @@
 import heapq
-
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -15,12 +16,14 @@ def compute_mutual_information(X):
     n_features = X.shape[1]  # 特征数量
     mi_matrix = np.zeros((n_features, n_features))
 
-    # 计算每对特征之间的互信息
-    with tqdm(total=n_features * (n_features - 1) // 2, desc="计算互信息") as pbar:
-        for i in range(n_features):
-            for j in range(i + 1, n_features):
-                mi_matrix[i, j] = mutual_info_score(X[:, i], X[:, j])
-                pbar.update(1)
+    def compute_pairwise_mi(i, j):
+        return i, j, mutual_info_score(X[:, i], X[:, j])
+
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(compute_pairwise_mi, i, j) for i in range(n_features) for j in range(i + 1, n_features)]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="计算互信息"):
+            i, j, mi = future.result()
+            mi_matrix[i, j] = mi
 
     np.fill_diagonal(mi_matrix, [mutual_info_score(X[:, i], X[:, i]) for i in range(n_features)])
     mi_matrix = mi_matrix + mi_matrix.T
@@ -161,7 +164,7 @@ class TAN:
 
 if __name__ == "__main__":
     # 加载数据集
-    docs, label = nb.loadDataSet(500)
+    docs, label = nb.loadDataSet(747)
 
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
@@ -199,4 +202,3 @@ if __name__ == "__main__":
 
     with open("tan/prob.txt","w") as file:
         file.write(str(y_prob))
-
