@@ -1,4 +1,4 @@
-name: nativeBayes
+name: naiveBayes
 
 on:
   watch:
