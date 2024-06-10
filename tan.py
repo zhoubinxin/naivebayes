@@ -161,7 +161,7 @@ class TAN:
 
 if __name__ == "__main__":
     # 加载数据集
-    docs, label = nb.loadDataSet(10)
+    docs, label = nb.loadDataSet(500)
 
     # 创建词汇表
     vocabList = nb.createVocabList(docs)
