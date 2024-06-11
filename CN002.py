@@ -359,7 +359,7 @@ def loadCNDataSet(lines, stop_words, sample_size=None):
     labels = []  # 存储标签
 
     try:
-        with open('./data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
+        with open('data/cnsmss/80w.txt', 'r', encoding='utf-8') as file:
             dataSet = [line.strip().split('\t') for line in islice(file, lines)]
     except:
         # GitHub action

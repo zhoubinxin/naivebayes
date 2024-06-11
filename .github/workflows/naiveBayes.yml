@@ -1,4 +1,4 @@
-name: nativeBayes
+name: naiveBayes
 
 on:
   watch:
@@ -25,10 +25,9 @@ jobs:
         run: python tan.py
 
       - name: Move generated files to a folder
-          # env:
-        # GITHUB_TOKEN: ${{ secrets.GithubToken }}
+        env:
+         GITHUB_TOKEN: ${{ secrets.GithubToken }}
         run: |
-          mkdir -p data
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git add -A
