@@ -489,8 +489,8 @@ def trainNB0(trainMatrix, trainCategory, alpha=0.1):
     pAbusive = sum(trainCategory) / float(numTrainDocs)  # 计算垃圾短信的概率
     # 初始化概率
     # 拉普拉斯平滑
-    p0Num = np.ones(numWords) + alpha
-    p1Num = np.ones(numWords) + alpha
+    p0Num = np.zeros(numWords) + alpha
+    p1Num = np.zeros(numWords) + alpha
     p0Denom = numWords * alpha
     p1Denom = numWords * alpha
 

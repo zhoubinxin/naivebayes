@@ -109,7 +109,7 @@ class TAN:
 
         mi_matrix = compute_mutual_information(X)  # 计算互信息矩阵
         self.edges = prim_algorithm(mi_matrix)  # 构建最大权重生成树
-
+        print(self.edges)
         self.feature_probs = {c: [{} for _ in range(n_features)] for c in self.classes}  # 初始化条件概率
         for c in tqdm(self.classes, desc="计算条件概率"):
             X_c = X[y == c]  # 获取属于类c的样本
@@ -161,7 +161,7 @@ class TAN:
 
 if __name__ == "__main__":
     # 加载数据集
-    docs, label = nb.loadDataSet(746)
+    docs, label = nb.loadDataSet(5)
 
     # 创建词汇表
     vocabList = nb.createVocabList(docs)

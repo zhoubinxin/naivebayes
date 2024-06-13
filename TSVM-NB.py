@@ -138,7 +138,7 @@ def main():
     X_train_o, X_test_o, y_train_o, y_test_o = train_test_split(trainMat, label, test_size=0.2, random_state=1)
 
     # 训练SVM模型
-    svm = SVC(kernel='linear',probability=True)
+    svm = SVC(kernel='linear', probability=True)
     svm.fit(X_train_o, y_train_o)
 
     svm_pred = svm.predict(X_test_o)
